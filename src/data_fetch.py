@@ -175,7 +175,7 @@ if __name__ == "__main__":
     papers = fetcher.fetch_papers(
         search_term="AI ethics",
         categories=["cs.CL", "cs.CY", "cs.AI"],
-        max_results=10,  # Start small!
+        max_results=100,  
         download_pdfs=True
     )
     

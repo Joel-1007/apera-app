@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  apera-app:
+    build: .
+    container_name: apera_system
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data             # Keep your 5000 papers safe
+      - ./chat_history.json:/app/chat_history.json
+      - ./audit_log.json:/app/audit_log.json
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434 # Talk to Mistral on Mac
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
