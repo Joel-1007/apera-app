@@ -11,7 +11,7 @@ import requests
 import streamlit as st
 
 # --- CONFIGURATION ---
-API_URL = "http://localhost:8000"  # FastAPI Backend
+API_URL = "https://unforsaken-sheri-unvitrified.ngrok-free.dev"
 HISTORY_FILE = "chat_history.json"
 AUDIT_FILE = "audit_log.json"
 CACHE_FILE = "arxiv_cache.json"
