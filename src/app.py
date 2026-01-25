@@ -567,6 +567,31 @@ if app_mode == "Admin Audit":
     else:
         st.info("📭 No audit logs available. Start chatting to generate governance data.")
 
+# --- PASTE THIS HERE ---
+    st.markdown("---")
+    st.subheader("📂 Ingest Knowledge Base")
+    st.info("Upload a PDF to create the Local Database.")
+    
+    # File Uploader
+    uploaded_file = st.file_uploader("Upload Research Paper (PDF)", type="pdf")
+
+    if uploaded_file:
+        if st.button("Process & Ingest"):
+            with st.spinner("🧠 Reading and indexing document..."):
+                # Prepare file for API
+                files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
+                try:
+                    # Send to Backend
+                    response = requests.post(f"{API_URL}/ingest", files=files)
+                    
+                    if response.status_code == 200:
+                        st.success("✅ Success! Local DB is now ready.")
+                        st.balloons()
+                    else:
+                        st.error(f"Failed: {response.text}")
+                except Exception as e:
+                    st.error(f"Connection Error: {e}")
+
 # --- RESEARCH ASSISTANT VIEW ---
 elif app_mode == "Research Assistant":
     # Epic Header
