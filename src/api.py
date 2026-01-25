@@ -79,10 +79,8 @@ async def ingest_document(file: UploadFile = File(...)):
             shutil.copyfileobj(file.file, buffer)
             
         # Add to RAG system (if your rag object supports it)
-        # If your RAG class doesn't have an ingest method yet, 
-        # this at least saves the file and stops the 404 error.
-        if hasattr(rag, 'ingest'):
-             rag.ingest(file_path)
+        if hasattr(agent, 'ingest'):
+             agent.ingest(file_path)
         
         return {"message": "File processed", "filename": file.filename}
     except Exception as e:
