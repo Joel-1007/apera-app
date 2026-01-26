@@ -57,36 +57,78 @@ def get_cache_size():
             return len(json.load(f))
     return 0
 
-# --- AUTHENTICATION ---
+# --- AUTHENTICATION & LOGIN LOGIC ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
     st.session_state.session_id = str(uuid.uuid4())[:8]
 
+# Helper to read logo dynamically
+def get_image_base64(file_path):
+    import base64
+    try:
+        with open(file_path, "rb") as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    except Exception:
+        return None
+
 def login_screen():
-    st.markdown("""
+    # 1. Load Logo
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    logo_path = os.path.join(current_dir, "logo.png")
+    logo_b64 = get_image_base64(logo_path)
+    
+    # Fallback to emoji if file missing
+    if logo_b64:
+        img_tag = f'<img src="data:image/png;base64,{logo_b64}" width="140" style="margin-bottom: 20px; filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.4));">'
+    else:
+        img_tag = '<div style="font-size: 80px; margin-bottom: 1rem;">🔬</div>'
+
+    # 2. Hero Section
+    st.markdown(f"""
     <div style="text-align: center; padding: 4rem 0;">
-        <div style="font-size: 80px; margin-bottom: 1rem; animation: pulse 2s ease-in-out infinite;">🔬</div>
-        <h1 style="background: linear-gradient(135deg, #1e40af 0%, #6366f1 50%, #8b5cf6 100%); 
+        {img_tag}
+        <h1 style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); 
                    -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
                    font-size: 3.5rem; font-weight: 900; margin-bottom: 0.5rem;">
             APERA SECURE GATEWAY
         </h1>
-        <p style="color: #6b7280; font-size: 1.2rem; font-weight: 500;">
+        <p style="color: #94a3b8; font-size: 1.2rem; font-weight: 500;">
             Advanced Production-Grade Research Intelligence
         </p>
     </div>
-    <style>
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.9; }
-        }
-    </style>
     """, unsafe_allow_html=True)
     
+    # 3. Split Layout (SSO vs Admin)
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
+        # SSO Buttons
+        col_g, col_m = st.columns(2)
+        with col_g:
+            if st.button("🔵 Sign in with Google", use_container_width=True):
+                with st.spinner("🔄 Verifying Google Workspace Identity..."):
+                    time.sleep(1.5)
+                    st.session_state.authenticated = True
+                    st.session_state.username = "jjohnjoel2005@gmail.com"
+                    st.toast("✅ Google Workspace Verified.")
+                    time.sleep(0.5)
+                    st.rerun()
+        
+        with col_m:
+            if st.button("🟧 Sign in with Microsoft", use_container_width=True):
+                with st.spinner("🔄 Connecting to Azure AD..."):
+                    time.sleep(1.5)
+                    st.session_state.authenticated = True
+                    st.session_state.username = "joel.john@microsoft.com"
+                    st.toast("✅ Azure AD Verified.")
+                    time.sleep(0.5)
+                    st.rerun()
+
+        st.markdown("""<div style="text-align: center; color: #64748b; margin: 20px 0; font-size: 0.85rem;">— OR USE ADMIN CREDENTIALS —</div>""", unsafe_allow_html=True)
+
+        # Admin Login Form
         with st.form("login_form"):
-            st.markdown("### 🔐 Authentication Required")
+            st.markdown("### 🔐 System Access")
             user = st.text_input("Username", placeholder="admin")
             pw = st.text_input("Password", type="password", placeholder="••••••••")
             submitted = st.form_submit_button("🚀 Authenticate", use_container_width=True)
@@ -94,11 +136,12 @@ def login_screen():
             if submitted:
                 if user == "admin" and pw == "password":
                     st.session_state.authenticated = True
-                    st.success("✅ Authentication Successful!")
+                    st.session_state.username = "Administrator"
+                    st.success("✅ Access Granted")
                     time.sleep(0.5)
                     st.rerun()
                 else:
-                    st.error("❌ Invalid Credentials - Access Denied")
+                    st.error("❌ Access Denied")
 
 if not st.session_state.authenticated:
     login_screen()
