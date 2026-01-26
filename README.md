@@ -9,7 +9,7 @@
 ## 📖 Executive Summary
 **APERA Pro** (Advanced Production-Grade Ethical Research Assistant) is a proof-of-concept AI system designed to solve the "Knowledge Cutoff" problem in academic research.
 
-Unlike standard chatbots that rely on frozen training data, APERA Pro uses a **Hybrid RAG (Retrieval-Augmented Generation)** architecture. It connects a cloud-based user interface to a local research engine that fetches, analyzes, and synthesizes **live pre-print papers from arXiv (2024-2026)** in real-time.
+Unlike standard chatbots that rely on frozen training data, APERA Pro uses a **Hybrid RAG (Retrieval-Augmented Generation)** architecture. It connects a cloud-based user interface to a local research engine that fetches, analyzes, and synthesizes **live pre-print papers from arXiv (2024- Beyond)** in real-time.
 
 The system emphasizes **AI Ethics** with a built-in Governance Dashboard that monitors toxicity, hallucination risks, and citation bias (Global North vs. Global South representation).
 
