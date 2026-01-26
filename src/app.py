@@ -105,22 +105,22 @@ def login_screen():
         # SSO Buttons
         col_g, col_m = st.columns(2)
         with col_g:
-            if st.button("🔵 Sign in with Google", use_container_width=True):
-                with st.spinner("🔄 Verifying Google Workspace Identity..."):
+            if st.button("Sign in with Google", use_container_width=True):
+                with st.spinner("Verifying Google Workspace Identity..."):
                     time.sleep(1.5)
                     st.session_state.authenticated = True
                     st.session_state.username = "jjohnjoel2005@gmail.com"
-                    st.toast("✅ Google Workspace Verified.")
+                    st.toast("Google Workspace Verified.")
                     time.sleep(0.5)
                     st.rerun()
         
         with col_m:
-            if st.button("🟧 Sign in with Microsoft", use_container_width=True):
-                with st.spinner("🔄 Connecting to Azure AD..."):
+            if st.button("Sign in with Microsoft", use_container_width=True):
+                with st.spinner("Connecting to Azure AD..."):
                     time.sleep(1.5)
                     st.session_state.authenticated = True
                     st.session_state.username = "joel.john@microsoft.com"
-                    st.toast("✅ Azure AD Verified.")
+                    st.toast(" Azure AD Verified.")
                     time.sleep(0.5)
                     st.rerun()
 
@@ -128,20 +128,20 @@ def login_screen():
 
         # Admin Login Form
         with st.form("login_form"):
-            st.markdown("### 🔐 System Access")
+            st.markdown("### System Access")
             user = st.text_input("Username", placeholder="admin")
             pw = st.text_input("Password", type="password", placeholder="••••••••")
-            submitted = st.form_submit_button("🚀 Authenticate", use_container_width=True)
+            submitted = st.form_submit_button("Authenticate", use_container_width=True)
             
             if submitted:
                 if user == "admin" and pw == "password":
                     st.session_state.authenticated = True
                     st.session_state.username = "Administrator"
-                    st.success("✅ Access Granted")
+                    st.success("Access Granted")
                     time.sleep(0.5)
                     st.rerun()
                 else:
-                    st.error("❌ Access Denied")
+                    st.error("Access Denied")
 
 if not st.session_state.authenticated:
     login_screen()
