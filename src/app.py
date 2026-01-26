@@ -478,7 +478,7 @@ with st.sidebar:
             st.rerun()
 
     st.divider()
-    if st.button("🚪 Secure Logout", use_container_width=True):
+    if st.button("🚪 Secure Logout", use_container_width=True, key="logout_sidebar"):
         st.session_state.authenticated = False
         st.rerun()
         
