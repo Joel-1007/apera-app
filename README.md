@@ -18,17 +18,38 @@ The system emphasizes **AI Ethics** with a built-in Governance Dashboard that mo
 ## 🏗️ System Architecture
 APERA Pro implements a **"Split-Brain" Strategy** to balance performance, cost, and security.
 
-```mermaid
 graph TD
-    User(User via Browser) <-->|HTTPS| Streamlit(Streamlit Cloud UI)
-    Streamlit <-->|Secure Tunnel| Ngrok(Ngrok Gateway)
-    Ngrok <-->|REST API| FastAPI(Local FastAPI Server)
+    User[👤 User via Browser] <-->|HTTPS| Streamlit[☁️ Streamlit Cloud UI]
+    Streamlit <-->|Encrypted Tunnel| Ngrok[🔒 Ngrok Gateway]
+    Ngrok <-->|REST API| FastAPI[⚡ Local FastAPI Server]
     
-    subgraph "Local Secure Environment (The Brain)"
-        FastAPI --> Agent[RAG Agent / Orchestrator]
-        Agent --> Arxiv[Live arXiv API]
-        Agent --> VectorDB[(FAISS Vector DB)]
-        Agent --> LLM[Ollama / Llama3]
+    subgraph "🧠 Local Secure Environment (The Brain)"
+        FastAPI --> Agent[🤖 RAG Agent / Orchestrator]
+        Agent --> Arxiv[📚 Live arXiv API]
+        Agent --> VectorDB[(🗄️ FAISS Vector DB)]
+        Agent --> LLM[🦙 Ollama / Llama3]
+        Agent --> Hybrid[🔍 Hybrid Search Engine]
         
-        VectorDB <--> Embed[SentenceTransformers]
+        VectorDB <--> Embed[🔢 SentenceTransformers]
+        Hybrid --> VectorDB
+        Hybrid --> BM25[📝 BM25 Keyword Search]
+        
+        Agent --> Governance[🛡️ Ethics & Audit Module]
+        Governance --> Toxicity[☠️ Toxicity Detector]
+        Governance --> Bias[🌍 Geographic Bias Analyzer]
+        Governance --> Hallucination[⚠️ Confidence Scorer]
     end
+    
+    FastAPI --> Database[(💾 SQLite Audit DB)]
+    
+    style User fill:#e1f5ff
+    style Streamlit fill:#ff6b6b
+    style Ngrok fill:#ffd93d
+    style FastAPI fill:#6bcf7f
+    style Agent fill:#a29bfe
+    style LLM fill:#fd79a8
+    style VectorDB fill:#fdcb6e
+    style Governance fill:#00b894
+
+
+    
