@@ -419,10 +419,9 @@ with st.sidebar:
     if app_mode == "Research Assistant":
         st.markdown("### ⚙️ Engine Configuration")
         
-        # UPDATED: Added Semantic Scholar option
-        search_mode = st.selectbox(
+       search_mode = st.selectbox(
             "Retrieval Strategy:", 
-            ["Local DB (Hybrid FAISS+BM25)", "Live Research (ArXiv)", "Semantic Scholar (API)"]
+            ["Live Research (ArXiv)"]
         )
         
         # Map to backend mode key
