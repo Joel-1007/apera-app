@@ -1,4 +1,4 @@
-# 🔬 APERA Pro: Advanced Production-Grade Research Intelligence
+# APERA Pro: Advanced Production-Grade Research Intelligence
 **A Hybrid, Ethical, and Live-Updating AI Research Assistant**
 
 ![Status](https://img.shields.io/badge/Status-Live_Beta-blueviolet)
