@@ -444,9 +444,10 @@ def get_base64_logo():
     return None
 logo_b64 = get_base64_logo()
 
-# --- SIDEBAR ---
+# --- SIDEBAR CONFIGURATION ---
 with st.sidebar:
-    if logo_b64:
+    # Safe check for logo (prevents NameError if not loaded)
+    if "logo_b64" in locals() and logo_b64:
         st.markdown(f'''
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
             <img src="data:image/png;base64,{logo_b64}" width="48" style="border-radius:12px;box-shadow:0 4px 15px rgba(139,92,246,0.4);">
@@ -462,10 +463,24 @@ with st.sidebar:
     if app_mode == "Research Assistant":
         st.markdown("### ⚙️ Engine Configuration")
         
-       search_mode = st.selectbox(
+        # FIXED INDENTATION HERE:
+        search_mode = st.selectbox(
             "Retrieval Strategy:", 
             ["Live Research (ArXiv)"]
         )
+        
+        # Set the mode key based on selection
+        mode_key = "online"
+        
+        st.divider()
+        if st.button("🗑️ Clear Context", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
+
+    st.divider()
+    if st.button("🚪 Secure Logout", use_container_width=True):
+        st.session_state.authenticated = False
+        st.rerun()
         
         # Map to backend mode key
         mode_key = "local"
