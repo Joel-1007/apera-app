@@ -495,11 +495,6 @@ with st.sidebar:
             save_history([])
             st.rerun()
 
-    st.divider()
-    if st.button("🚪 Secure Logout", use_container_width=True):
-        st.session_state.authenticated = False
-        st.rerun()
-
 # --- ADMIN AUDIT VIEW ---
 if app_mode == "Admin Audit":
     st.markdown("""
