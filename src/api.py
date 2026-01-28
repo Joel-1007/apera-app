@@ -1,6 +1,7 @@
 import sys
 import os
 from fastapi import UploadFile, File
+import shutil
 
 # --- CRITICAL FIX: Add Project Root to Path ---
 # This forces Python to see 'src' as a module
@@ -64,6 +65,23 @@ def toxicity_stats():
 @app.get("/admin/logs")
 def session_logs(session_id: str = None):
     return get_session_logs(session_id)
+
+# --- ADD THIS TO src/api.py ---
+@app.post("/ingest")
+async def ingest_document(file: UploadFile = File(...)):
+    try:
+        os.makedirs("temp_data", exist_ok=True)
+        file_path = f"temp_data/{file.filename}"
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Load into Agent if supported, otherwise just save
+        if hasattr(agent, 'ingest'):
+             agent.ingest(file_path)
+             
+        return {"message": "Successfully ingested", "filename": file.filename}
+    except Exception as e:
+        return {"detail": str(e)}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
