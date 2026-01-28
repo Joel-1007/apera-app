@@ -225,7 +225,7 @@ def build_citation(paper: Dict[str, Any]) -> Dict[str, str]:
 # ==========================================
 # API ENDPOINTS
 # ==========================================
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/chat")  # ← Remove response_model temporarily
 async def chat_endpoint(request: ChatRequest):
     """
     Main chat endpoint with comprehensive error handling
@@ -339,7 +339,11 @@ async def chat_endpoint(request: ChatRequest):
         logger.info("✅ Chat endpoint completed successfully")
         logger.info("="*80 + "\n")
         
-        return final_response
+    return {
+    "response": response_text,
+    "citations": citations,
+    "meta": meta_data
+        }
         
     except ValidationError as val_error:
         logger.error(f"❌ Validation Error: {val_error}")
