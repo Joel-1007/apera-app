@@ -244,8 +244,8 @@ def login_page():
 # --- 4. APP FLOW CONTROL ---
 if not st.session_state.authenticated:
     login_page()
-    st.stop()
-    
+    st.stop() # Stop here if not logged in
+
 # --- EPIC GOD MODE CSS ---
 st.markdown("""
 <style>
@@ -282,20 +282,6 @@ st.markdown("""
     @keyframes headerGlow {
         0%, 100% { box-shadow: 0 20px 60px rgba(139, 92, 246, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1) inset; }
         50% { box-shadow: 0 20px 80px rgba(139, 92, 246, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.2) inset; }
-    }
-    .header-container::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 200%;
-        background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
-        animation: rotate 20s linear infinite;
-    }
-    @keyframes rotate {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
     }
     
     .logo-img { 
@@ -543,7 +529,9 @@ def get_base64_logo():
     return None
 logo_b64 = get_base64_logo()
 
-# --- COPY AND PASTE THIS INTO src/app.py (REPLACING THE SIDEBAR SECTION) ---
+# ==========================================
+# UNIFIED SIDEBAR
+# ==========================================
 
 with st.sidebar:
     # 1. Logo Display
@@ -570,11 +558,22 @@ with st.sidebar:
             "Retrieval Strategy:", 
             ["Live Research (ArXiv)"]
         )
+        # Fix: Sync variables so API call works
+        mode_key = search_mode 
         
         st.divider()
         if st.button("🗑️ Clear Context", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
+    else:
+        # Default for Admin mode
+        search_mode = "Audit"
+        mode_key = "audit"
+
+    # 5. Secure Logout (ONLY ONE BUTTON HERE)
+    st.divider()
+    if st.button("🚪 Secure Logout", use_container_width=True, key="unique_logout_key"):
+        logout()
 
 # --- ADMIN AUDIT VIEW ---
 if app_mode == "Admin Audit":
@@ -700,7 +699,6 @@ if app_mode == "Admin Audit":
     else:
         st.info("📭 No audit logs available. Start chatting to generate governance data.")
 
-# --- PASTE THIS HERE ---
     st.markdown("---")
     st.subheader("📂 Ingest Knowledge Base")
     st.info("Upload a PDF to create the Local Database.")
