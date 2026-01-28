@@ -185,7 +185,7 @@ def login_page():
                         time.sleep(1.2)
                         st.session_state.authenticated = True
                         st.session_state.username = "Joel John (Google)"
-                        st.session_state.user_email = "joel.john@google.com" # <--- ADDED EMAIL
+                        st.session_state.user_email = "jjohnjoel2005@gmail.com" # <--- ADDED EMAIL
                         st.session_state.auth_provider = "Google"
                         st.rerun()
             with col_m:
@@ -194,7 +194,7 @@ def login_page():
                         time.sleep(1.2)
                         st.session_state.authenticated = True
                         st.session_state.username = "Joel John (Microsoft)"
-                        st.session_state.user_email = "joel.john@microsoft.com" # <--- ADDED EMAIL
+                        st.session_state.user_email = "jjohnjoel2005@microsoft.com" # <--- ADDED EMAIL
                         st.session_state.auth_provider = "Microsoft"
                         st.rerun()
 
@@ -582,12 +582,6 @@ with st.sidebar:
         if st.button("🗑️ Clear Context", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
-
-    # 5. Secure Logout (ONLY ONE BUTTON HERE)
-    st.divider()
-    if st.button("🚪 Secure Logout", use_container_width=True, key="unique_logout_key"):
-        st.session_state.authenticated = False
-        st.rerun()
 
 # --- ADMIN AUDIT VIEW ---
 if app_mode == "Admin Audit":
