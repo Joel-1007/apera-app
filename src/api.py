@@ -225,7 +225,7 @@ def build_citation(paper: Dict[str, Any]) -> Dict[str, str]:
 # ==========================================
 # API ENDPOINTS
 # ==========================================
-@app.post("/chat")  # ← Remove response_model temporarily
+@app.post("/chat")  # Removed response_model temporarily to avoid Pydantic validation issues
 async def chat_endpoint(request: ChatRequest):
     """
     Main chat endpoint with comprehensive error handling
@@ -253,11 +253,11 @@ async def chat_endpoint(request: ChatRequest):
         # Validate query
         if not request.query or len(request.query.strip()) == 0:
             logger.warning("⚠️ Empty query received")
-            return ChatResponse(
-                response="Please provide a valid research question.",
-                citations=[],
-                meta={"intent": "ERROR", "confidence": 0, "fairness": {"balance_label": "N/A", "diversity_flag": False}}
-            )
+            return {
+                "response": "Please provide a valid research question.",
+                "citations": [],
+                "meta": {"intent": "ERROR", "confidence": 0, "fairness": {"balance_label": "N/A", "diversity_flag": False}}
+            }
         
         # MODE: LIVE RESEARCH (ArXiv)
         if "ArXiv" in request.mode or "Research" in request.mode:
@@ -329,22 +329,17 @@ async def chat_endpoint(request: ChatRequest):
             meta_data["confidence"] = 95
             meta_data["intent"] = "AUDIT"
         
-        # Build final response
-        final_response = ChatResponse(
-            response=response_text,
-            citations=citations,
-            meta=meta_data
-        )
-        
+        # ✅ FIXED: Return is now INSIDE the try block
         logger.info("✅ Chat endpoint completed successfully")
         logger.info("="*80 + "\n")
         
-    return {
-    "response": response_text,
-    "citations": citations,
-    "meta": meta_data
+        return {
+            "response": response_text,
+            "citations": citations,
+            "meta": meta_data
         }
-        
+    
+    # ✅ FIXED: except blocks now properly follow the try block
     except ValidationError as val_error:
         logger.error(f"❌ Validation Error: {val_error}")
         raise HTTPException(status_code=422, detail=str(val_error))
@@ -356,16 +351,16 @@ async def chat_endpoint(request: ChatRequest):
         logger.error(f"   Traceback:\n{traceback.format_exc()}")
         
         # Return a safe error response instead of crashing
-        return ChatResponse(
-            response=f"I encountered an unexpected error: {str(e)}\n\nPlease check the backend logs for details.",
-            citations=[],
-            meta={
+        return {
+            "response": f"I encountered an unexpected error: {str(e)}\n\nPlease check the backend logs for details.",
+            "citations": [],
+            "meta": {
                 "intent": "ERROR",
                 "confidence": 0,
                 "fairness": {"balance_label": "N/A", "diversity_flag": False},
                 "error_type": type(e).__name__
             }
-        )
+        }
 
 @app.post("/ingest")
 async def ingest_document(file: UploadFile = File(...)):
