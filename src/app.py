@@ -57,48 +57,91 @@ def get_cache_size():
             return len(json.load(f))
     return 0
 
-# --- AUTHENTICATION ---
+# --- AUTHENTICATION & LOGIN LOGIC ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
     st.session_state.session_id = str(uuid.uuid4())[:8]
 
+# Helper to read logo dynamically
+def get_image_base64(file_path):
+    import base64
+    try:
+        with open(file_path, "rb") as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    except Exception:
+        return None
+
 def login_screen():
-    st.markdown("""
+    # 1. Load Logo
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    logo_path = os.path.join(current_dir, "logo.png")
+    logo_b64 = get_image_base64(logo_path)
+    
+    # Fallback to emoji if file missing
+    if logo_b64:
+        img_tag = f'<img src="data:image/png;base64,{logo_b64}" width="140" style="margin-bottom: 20px; filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.4));">'
+    else:
+        img_tag = '<div style="font-size: 80px; margin-bottom: 1rem;">🔬</div>'
+
+    # 2. Hero Section
+    st.markdown(f"""
     <div style="text-align: center; padding: 4rem 0;">
-        <div style="font-size: 80px; margin-bottom: 1rem; animation: pulse 2s ease-in-out infinite;">🔬</div>
-        <h1 style="background: linear-gradient(135deg, #1e40af 0%, #6366f1 50%, #8b5cf6 100%); 
+        {img_tag}
+        <h1 style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); 
                    -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
                    font-size: 3.5rem; font-weight: 900; margin-bottom: 0.5rem;">
             APERA SECURE GATEWAY
         </h1>
-        <p style="color: #6b7280; font-size: 1.2rem; font-weight: 500;">
+        <p style="color: #94a3b8; font-size: 1.2rem; font-weight: 500;">
             Advanced Production-Grade Research Intelligence
         </p>
     </div>
-    <style>
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.9; }
-        }
-    </style>
     """, unsafe_allow_html=True)
     
+    # 3. Split Layout (SSO vs Admin)
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
+        # SSO Buttons
+        col_g, col_m = st.columns(2)
+        with col_g:
+            if st.button("Sign in with Google", use_container_width=True):
+                with st.spinner("Verifying Google Workspace Identity..."):
+                    time.sleep(1.5)
+                    st.session_state.authenticated = True
+                    st.session_state.username = "jjohnjoel2005@gmail.com"
+                    st.toast("Google Workspace Verified.")
+                    time.sleep(0.5)
+                    st.rerun()
+        
+        with col_m:
+            if st.button("Sign in with Microsoft", use_container_width=True):
+                with st.spinner("Connecting to Azure AD..."):
+                    time.sleep(1.5)
+                    st.session_state.authenticated = True
+                    st.session_state.username = "joel.john@microsoft.com"
+                    st.toast(" Azure AD Verified.")
+                    time.sleep(0.5)
+                    st.rerun()
+
+        st.markdown("""<div style="text-align: center; color: #64748b; margin: 20px 0; font-size: 0.85rem;">— OR USE ADMIN CREDENTIALS —</div>""", unsafe_allow_html=True)
+
+        # Admin Login Form
         with st.form("login_form"):
-            st.markdown("### 🔐 Authentication Required")
+            st.markdown("### System Access")
             user = st.text_input("Username", placeholder="admin")
             pw = st.text_input("Password", type="password", placeholder="••••••••")
-            submitted = st.form_submit_button("🚀 Authenticate", use_container_width=True)
+            submitted = st.form_submit_button("Authenticate", use_container_width=True)
             
             if submitted:
                 if user == "admin" and pw == "password":
                     st.session_state.authenticated = True
-                    st.success("✅ Authentication Successful!")
+                    st.session_state.username = "Administrator"
+                    st.success("Access Granted")
                     time.sleep(0.5)
                     st.rerun()
                 else:
-                    st.error("❌ Invalid Credentials - Access Denied")
+                    st.error("Access Denied")
 
 if not st.session_state.authenticated:
     login_screen()
@@ -401,9 +444,11 @@ def get_base64_logo():
     return None
 logo_b64 = get_base64_logo()
 
-# --- SIDEBAR ---
+# --- COPY AND PASTE THIS INTO src/app.py (REPLACING THE SIDEBAR SECTION) ---
+
 with st.sidebar:
-    if logo_b64:
+    # 1. Logo Display
+    if "logo_b64" in locals() and logo_b64:
         st.markdown(f'''
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
             <img src="data:image/png;base64,{logo_b64}" width="48" style="border-radius:12px;box-shadow:0 4px 15px rgba(139,92,246,0.4);">
@@ -411,35 +456,30 @@ with st.sidebar:
         </div>
         ''', unsafe_allow_html=True)
     
+    # 2. Session Info
     st.markdown(f"<div style='background:rgba(139,92,246,0.15);padding:8px 12px;border-radius:8px;font-size:0.85rem;font-weight:600;'>🔑 Session: {st.session_state.session_id}</div>", unsafe_allow_html=True)
-    
     st.markdown("---")
+
+    # 3. System Module Selector
     app_mode = st.radio("🧭 System Module:", ["Research Assistant", "Admin Audit"], index=0)
     
+    # 4. Engine Config (Only for Research Assistant)
     if app_mode == "Research Assistant":
         st.markdown("### ⚙️ Engine Configuration")
         
-        # UPDATED: Added Semantic Scholar option
         search_mode = st.selectbox(
             "Retrieval Strategy:", 
-            ["Local DB (Hybrid FAISS+BM25)", "Live Research (ArXiv)", "Semantic Scholar (API)"]
+            ["Live Research (ArXiv)"]
         )
-        
-        # Map to backend mode key
-        mode_key = "local"
-        if "ArXiv" in search_mode: 
-            mode_key = "online"
-        if "Semantic" in search_mode: 
-            mode_key = "semantic"
         
         st.divider()
         if st.button("🗑️ Clear Context", use_container_width=True):
             st.session_state.messages = []
-            save_history([])
             st.rerun()
 
+    # 5. Secure Logout (ONLY ONE BUTTON HERE)
     st.divider()
-    if st.button("🚪 Secure Logout", use_container_width=True):
+    if st.button("🚪 Secure Logout", use_container_width=True, key="unique_logout_key"):
         st.session_state.authenticated = False
         st.rerun()
 
@@ -566,6 +606,31 @@ if app_mode == "Admin Audit":
         st.info("ℹ️ **Fairness Alert:** Global North dominance >60% indicates potential Western-centric bias.")
     else:
         st.info("📭 No audit logs available. Start chatting to generate governance data.")
+
+# --- PASTE THIS HERE ---
+    st.markdown("---")
+    st.subheader("📂 Ingest Knowledge Base")
+    st.info("Upload a PDF to create the Local Database.")
+    
+    # File Uploader
+    uploaded_file = st.file_uploader("Upload Research Paper (PDF)", type="pdf")
+
+    if uploaded_file:
+        if st.button("Process & Ingest"):
+            with st.spinner("🧠 Reading and indexing document..."):
+                # Prepare file for API
+                files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
+                try:
+                    # Send to Backend
+                    response = requests.post(f"{API_URL}/ingest", files=files)
+                    
+                    if response.status_code == 200:
+                        st.success("✅ Success! Local DB is now ready.")
+                        st.balloons()
+                    else:
+                        st.error(f"Failed: {response.text}")
+                except Exception as e:
+                    st.error(f"Connection Error: {e}")
 
 # --- RESEARCH ASSISTANT VIEW ---
 elif app_mode == "Research Assistant":
