@@ -63,11 +63,6 @@ import sqlite3
 import hashlib
 import time
 import os
-
-import sqlite3
-import hashlib
-import time
-import os
 import base64
 
 # --- 1. DATABASE & SECURITY FUNCTIONS ---
@@ -135,11 +130,13 @@ def get_image_base64(file_path):
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
     st.session_state.username = None
+    st.session_state.user_email = None # <--- ADDED THIS FIX
     st.session_state.auth_provider = None
 
 def logout():
     st.session_state.authenticated = False
     st.session_state.username = None
+    st.session_state.user_email = None
     st.rerun()
 
 # --- 3. LOGIN PAGE UI (CENTERED) ---
@@ -158,7 +155,6 @@ def login_page():
         img_tag = '<div style="font-size: 60px; margin-bottom: 1rem;">🔬</div>'
 
     # 2. Centered Layout
-    # Use columns to squeeze content into the middle
     left, center, right = st.columns([1, 2, 1])
     
     with center:
@@ -191,6 +187,7 @@ def login_page():
                         time.sleep(1.2)
                         st.session_state.authenticated = True
                         st.session_state.username = "Joel John (Google)"
+                        st.session_state.user_email = "joel.john@google.com" # <--- ADDED EMAIL
                         st.session_state.auth_provider = "Google"
                         st.rerun()
             with col_m:
@@ -199,6 +196,7 @@ def login_page():
                         time.sleep(1.2)
                         st.session_state.authenticated = True
                         st.session_state.username = "Joel John (Microsoft)"
+                        st.session_state.user_email = "joel.john@microsoft.com" # <--- ADDED EMAIL
                         st.session_state.auth_provider = "Microsoft"
                         st.rerun()
 
@@ -214,6 +212,7 @@ def login_page():
                     if email == "admin" and password == "password":
                          st.session_state.authenticated = True
                          st.session_state.username = "Administrator"
+                         st.session_state.user_email = "admin@apera.com" # <--- ADDED EMAIL
                          st.session_state.auth_provider = "Admin"
                          st.rerun()
                     
@@ -222,6 +221,7 @@ def login_page():
                     if user_result:
                         st.session_state.authenticated = True
                         st.session_state.username = user_result[0][2]
+                        st.session_state.user_email = email # <--- ADDED EMAIL
                         st.session_state.auth_provider = "Local"
                         st.rerun()
                     else:
