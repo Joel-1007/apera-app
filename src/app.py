@@ -59,11 +59,6 @@ def get_cache_size():
             return len(json.load(f))
     return 0
 
-import sqlite3
-import hashlib
-import time
-import os
-import base64
 
 # --- 1. DATABASE & SECURITY FUNCTIONS ---
 def init_db():
@@ -130,15 +125,18 @@ def get_image_base64(file_path):
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
     st.session_state.username = None
-    st.session_state.user_email = None # <--- ADDED THIS FIX
+    st.session_state.user_email = None
     st.session_state.auth_provider = None
+    # This was missing before:
+    st.session_state.session_id = str(uuid.uuid4())[:8] 
 
 def logout():
     st.session_state.authenticated = False
     st.session_state.username = None
     st.session_state.user_email = None
+    # Clear the session ID on logout too if you want, or keep it
     st.rerun()
-
+    
 # --- 3. LOGIN PAGE UI (CENTERED) ---
 def login_page():
     init_db() # Ensure DB exists
