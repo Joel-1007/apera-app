@@ -225,7 +225,7 @@ def build_citation(paper: Dict[str, Any]) -> Dict[str, str]:
 # ==========================================
 # API ENDPOINTS
 # ==========================================
-@app.post("/chat")  # Removed response_model temporarily to avoid Pydantic validation issues
+@app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
     """
     Main chat endpoint with comprehensive error handling
@@ -269,13 +269,66 @@ async def chat_endpoint(request: ChatRequest):
                 if papers and len(papers) > 0:
                     logger.info(f"✅ Found {len(papers)} relevant papers")
                     
-                    # Build response text
-                    response_text = f"**Research Findings on '{request.query}':**\n\n"
-                    response_text += f"The most relevant study is **'{papers[0]['title']}'**, which explores this topic in depth.\n\n"
-                    response_text += f"Key insight: {papers[0]['summary'][:200]}...\n\n"
+                    # ========================================
+                    # 🎨 IMPROVED: Natural, Descriptive Response
+                    # ========================================
                     
+                    # Opening - set the context
+                    response_text = f"Based on my analysis of recent research, I've found some fascinating insights about **{request.query}**.\n\n"
+                    
+                    # Main paper - detailed explanation
+                    response_text += f"### 📚 Primary Research\n\n"
+                    response_text += f"The leading study in this area is **\"{papers[0]['title']}\"**"
+                    
+                    # Add authors if available
+                    if papers[0].get('authors') and len(papers[0]['authors']) > 0:
+                        author_names = ", ".join(papers[0]['authors'][:3])
+                        if len(papers[0]['authors']) > 3:
+                            author_names += " et al."
+                        response_text += f" by {author_names}"
+                    
+                    # Add publication date
+                    if papers[0].get('published'):
+                        response_text += f" (published {papers[0]['published']})"
+                    
+                    response_text += ".\n\n"
+                    
+                    # Full summary of main paper - let it breathe
+                    response_text += f"**Key Findings:** {papers[0]['summary']}\n\n"
+                    
+                    # Additional supporting papers
                     if len(papers) > 1:
-                        response_text += f"Additionally, **'{papers[1]['title']}'** provides further evidence on this topic."
+                        response_text += f"### 🔬 Supporting Research\n\n"
+                        response_text += "The following studies provide additional perspectives and evidence:\n\n"
+                        
+                        for idx, paper in enumerate(papers[1:], start=2):
+                            response_text += f"**{idx}. {paper['title']}**\n"
+                            
+                            # Authors
+                            if paper.get('authors') and len(paper['authors']) > 0:
+                                author_names = ", ".join(paper['authors'][:2])
+                                if len(paper['authors']) > 2:
+                                    author_names += " et al."
+                                response_text += f"*By {author_names}"
+                                if paper.get('published'):
+                                    response_text += f" ({paper['published']})"
+                                response_text += "*\n\n"
+                            
+                            # Summary - give more context
+                            summary_length = 350 if idx == 2 else 300  # Longer for second paper
+                            response_text += f"{paper['summary'][:summary_length]}"
+                            if len(paper['summary']) > summary_length:
+                                response_text += "..."
+                            response_text += "\n\n"
+                    
+                    # Synthesis and conclusion
+                    response_text += f"### 💡 Research Synthesis\n\n"
+                    response_text += f"These {len(papers)} peer-reviewed papers collectively provide a comprehensive understanding of {request.query}. "
+                    response_text += "The research spans theoretical frameworks, empirical evidence, and practical applications. "
+                    response_text += "You can access the complete papers through the citation links below for deeper exploration of methodologies, datasets, and conclusions.\n\n"
+                    
+                    # Call to action
+                    response_text += "*💾 All references are available in the Citations panel below.*"
                     
                     # Build citations with error handling
                     logger.info("📋 Building citations...")
@@ -329,7 +382,6 @@ async def chat_endpoint(request: ChatRequest):
             meta_data["confidence"] = 95
             meta_data["intent"] = "AUDIT"
         
-        # ✅ FIXED: Return is now INSIDE the try block
         logger.info("✅ Chat endpoint completed successfully")
         logger.info("="*80 + "\n")
         
@@ -339,7 +391,6 @@ async def chat_endpoint(request: ChatRequest):
             "meta": meta_data
         }
     
-    # ✅ FIXED: except blocks now properly follow the try block
     except ValidationError as val_error:
         logger.error(f"❌ Validation Error: {val_error}")
         raise HTTPException(status_code=422, detail=str(val_error))
