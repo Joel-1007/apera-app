@@ -14,6 +14,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import re
 import json
+import requests
 
 # ==========================================
 # LOGGING CONFIGURATION
@@ -40,8 +41,8 @@ logger = logging.getLogger("APERA")
 # ==========================================
 app = FastAPI(
     title="APERA Brain API",
-    version="7.0-claude-powered",
-    description="Claude-powered research intelligence with advanced synthesis"
+    version="8.0-free-local-ai",
+    description="100% FREE - Powered by local AI (Ollama) - ZERO payment"
 )
 
 app.add_middleware(
@@ -91,17 +92,20 @@ class Citation(BaseModel):
     url: str
     type: str
 
-class ChatResponse(BaseModel):
-    response: str
-    citations: List[Citation]
-    meta: Dict[str, Any]
-
 # ==========================================
-# CLAUDE AI INTEGRATION
+# FREE LOCAL AI INTEGRATION (OLLAMA)
 # ==========================================
-def call_claude_api(prompt: str, system_prompt: str = None, max_tokens: int = 2048) -> str:
+def call_local_ai(prompt: str, system_prompt: str = None, max_tokens: int = 2048) -> str:
     """
-    Call Claude API for advanced AI analysis
+    Call LOCAL AI (Ollama) - 100% FREE, runs on your machine
+    
+    Ollama supports many models:
+    - llama3.2 (3B) - Fast, good for explanations
+    - mistral (7B) - Best balance of speed/quality
+    - llama3.1 (8B) - High quality
+    - deepseek-r1 (7B) - Good reasoning
+    
+    NO API KEY NEEDED. NO PAYMENT. RUNS LOCALLY.
     
     Args:
         prompt: The user prompt
@@ -109,46 +113,59 @@ def call_claude_api(prompt: str, system_prompt: str = None, max_tokens: int = 20
         max_tokens: Maximum response length
         
     Returns:
-        Claude's response text
+        AI response text
     """
     try:
-        # Check if API key is available
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        # Check if Ollama is running
+        ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
         
-        if not api_key:
-            logger.warning("⚠️ ANTHROPIC_API_KEY not set - using fallback mode")
+        logger.info(f"🤖 Calling LOCAL AI (Ollama) at {ollama_url}...")
+        
+        # Choose model (can be configured)
+        model = os.environ.get("OLLAMA_MODEL", "llama3.2")
+        
+        # Build messages
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        
+        # Call Ollama API
+        response = requests.post(
+            f"{ollama_url}/api/chat",
+            json={
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "options": {
+                    "num_predict": max_tokens,
+                    "temperature": 0.7
+                }
+            },
+            timeout=60
+        )
+        
+        if response.status_code != 200:
+            logger.error(f"❌ Ollama error: {response.status_code}")
             return None
         
-        logger.info("🤖 Calling Claude API...")
+        result = response.json()
+        response_text = result.get("message", {}).get("content", "")
         
-        import anthropic
-        
-        client = anthropic.Anthropic(api_key=api_key)
-        
-        messages = [{"role": "user", "content": prompt}]
-        
-        kwargs = {
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": max_tokens,
-            "messages": messages
-        }
-        
-        if system_prompt:
-            kwargs["system"] = system_prompt
-        
-        message = client.messages.create(**kwargs)
-        
-        response_text = message.content[0].text
-        
-        logger.info(f"✅ Claude API responded: {len(response_text)} chars")
+        logger.info(f"✅ Local AI responded: {len(response_text)} chars")
+        logger.info(f"   Model: {model}")
+        logger.info(f"   Cost: $0.00 (FREE!)")
         
         return response_text
         
-    except ImportError:
-        logger.error("❌ Anthropic package not installed. Run: pip install anthropic --break-system-packages")
+    except requests.exceptions.ConnectionError:
+        logger.error("❌ Ollama not running. Start it with: ollama serve")
+        return None
+    except requests.exceptions.Timeout:
+        logger.error("❌ Ollama timeout - response took too long")
         return None
     except Exception as e:
-        logger.error(f"❌ Claude API error: {type(e).__name__}: {str(e)}")
+        logger.error(f"❌ Local AI error: {type(e).__name__}: {str(e)}")
         logger.error(f"   Traceback:\n{traceback.format_exc()}")
         return None
 
@@ -157,28 +174,22 @@ def call_claude_api(prompt: str, system_prompt: str = None, max_tokens: int = 20
 # ==========================================
 def generate_advanced_research_synthesis(query: str, papers: List[Dict[str, Any]]) -> str:
     """
-    Use Claude to analyze ArXiv papers and generate sophisticated research synthesis
-    
-    This is the ADVANCED mode - Claude reads all papers and creates an intelligent summary
+    Use LOCAL AI to analyze ArXiv papers and generate sophisticated research synthesis
+    100% FREE - NO API COSTS!
     
     Args:
         query: User's research question
-        papers: List of ArXiv papers with titles, authors, abstracts
+        papers: List of ArXiv papers
         
     Returns:
-        Claude-generated comprehensive research synthesis
+        AI-generated comprehensive research synthesis
     """
-    logger.info(f"🧠 Generating ADVANCED research synthesis with Claude AI...")
+    logger.info(f"🧠 Generating research synthesis with LOCAL AI (FREE)...")
     
     if not papers or len(papers) == 0:
-        logger.warning("⚠️ No papers provided for synthesis")
         return None
     
-    # ========================================
-    # BUILD COMPREHENSIVE PROMPT FOR CLAUDE
-    # ========================================
-    
-    # Prepare paper summaries for Claude
+    # Prepare paper summaries
     papers_context = ""
     for idx, paper in enumerate(papers, 1):
         papers_context += f"\n\n{'='*80}\n"
@@ -189,82 +200,132 @@ def generate_advanced_research_synthesis(query: str, papers: List[Dict[str, Any]
         if len(paper['authors']) > 5:
             papers_context += " et al."
         papers_context += f"\nPublished: {paper['published']}\n"
-        papers_context += f"URL: {paper['url']}\n"
         papers_context += f"\nABSTRACT:\n{paper['summary']}\n"
     
-    system_prompt = """You are an expert research analyst specializing in synthesizing academic literature. Your role is to:
+    system_prompt = """You are an expert research analyst. Your role is to:
 
 1. Analyze multiple research papers deeply
 2. Identify key themes, methodologies, and findings
 3. Compare and contrast different approaches
 4. Explain complex concepts clearly
 5. Provide actionable insights
-6. Cite papers appropriately using inline references like [Paper 1], [Paper 2]
+6. Cite papers using [Paper 1], [Paper 2] format
 
-Write in a professional yet accessible academic style. Use markdown formatting with headers, bullet points, and emphasis where appropriate."""
+Write in a professional yet accessible style. Use markdown formatting."""
 
     user_prompt = f"""I'm researching: "{query}"
 
-I've found {len(papers)} relevant academic papers from ArXiv. Please analyze these papers and provide a comprehensive research synthesis.
+I've found {len(papers)} relevant papers from ArXiv. Please analyze them and provide a comprehensive research synthesis.
 
 {papers_context}
 
 {'='*80}
 
-Please provide a detailed research synthesis that includes:
+Provide a detailed synthesis including:
 
-1. **Executive Summary** (2-3 sentences): What are the key takeaways?
+1. **Executive Summary** (2-3 sentences): Key takeaways
 
-2. **Core Concepts & Definitions**: Explain the fundamental concepts addressed in these papers
+2. **Core Concepts**: Fundamental concepts in these papers
 
-3. **Methodological Approaches**: What methods/techniques do these papers use?
+3. **Methodological Approaches**: Methods/techniques used
 
-4. **Key Findings & Contributions**: What are the major discoveries or innovations?
+4. **Key Findings**: Major discoveries and innovations
 
-5. **Comparative Analysis**: How do these papers relate to each other? Do they agree, disagree, or complement?
+5. **Comparative Analysis**: How papers relate - agree/disagree/complement?
 
-6. **Practical Applications**: What are the real-world implications?
+6. **Practical Applications**: Real-world implications
 
-7. **Research Gaps & Future Directions**: What questions remain unanswered?
+7. **Research Gaps**: What questions remain unanswered?
 
-8. **Recommended Reading Order**: Which papers should be read first, and why?
+8. **Reading Recommendation**: Which papers to read first and why?
 
-Use inline citations like [Paper 1], [Paper 2], etc. throughout your analysis. Make it comprehensive yet readable - aim for 600-1000 words.
+Use citations like [Paper 1], [Paper 2]. Aim for 600-800 words."""
 
-Remember: You're writing for someone who wants deep understanding, not just a surface-level summary."""
-
-    # ========================================
-    # CALL CLAUDE API
-    # ========================================
-    
-    synthesis = call_claude_api(
+    synthesis = call_local_ai(
         prompt=user_prompt,
         system_prompt=system_prompt,
-        max_tokens=3000
+        max_tokens=2500
     )
     
     if synthesis:
-        logger.info(f"✅ Advanced synthesis generated: {len(synthesis)} chars")
+        logger.info(f"✅ Local AI synthesis: {len(synthesis)} chars")
         return synthesis
-    else:
-        logger.warning("⚠️ Claude API unavailable, using fallback synthesis")
-        return None
+    
+    return None
+
+def generate_conceptual_explanation(query: str, papers: List[Dict[str, Any]] = None) -> str:
+    """
+    Use LOCAL AI to generate conceptual explanation
+    100% FREE!
+    
+    Args:
+        query: The conceptual question
+        papers: Optional papers for context
+        
+    Returns:
+        AI-generated explanation
+    """
+    logger.info(f"🎓 Generating conceptual explanation with LOCAL AI...")
+    
+    papers_context = ""
+    if papers and len(papers) > 0:
+        papers_context = f"\n\nREFERENCE (optional):\n"
+        for idx, paper in enumerate(papers[:2], 1):
+            papers_context += f"\nPaper {idx}: {paper['title']}\n"
+            papers_context += f"Summary: {paper['summary'][:250]}...\n"
+    
+    system_prompt = """You are an expert educator explaining technical concepts. Your explanations should:
+
+1. Start with a clear, simple definition
+2. Break down into understandable components
+3. Use analogies and examples
+4. Compare with related concepts
+5. Explain practical applications
+6. Be accurate but accessible
+
+Use markdown with headers (###), bullet points, and **bold** for emphasis."""
+
+    user_prompt = f"""Explain this question clearly:
+
+"{query}"
+{papers_context}
+
+Structure your explanation:
+
+1. **Clear Definition**: What is this in simple terms?
+2. **Key Components**: Essential parts/elements
+3. **How It Works**: The mechanism or process
+4. **Practical Examples**: Real-world applications
+5. **Important Distinctions**: How it differs from similar concepts
+6. **When to Use**: Guidelines for application
+
+Aim for 400-600 words. Technical but accessible."""
+
+    explanation = call_local_ai(
+        prompt=user_prompt,
+        system_prompt=system_prompt,
+        max_tokens=1800
+    )
+    
+    if explanation:
+        logger.info(f"✅ Explanation generated: {len(explanation)} chars")
+        return explanation
+    
+    return None
 
 def generate_fallback_synthesis(query: str, papers: List[Dict[str, Any]]) -> str:
     """
-    Fallback synthesis when Claude API is unavailable
-    Creates intelligent structured summary without AI
+    Fallback synthesis when AI is unavailable
+    Still produces good structured output
     """
-    logger.info("📝 Generating fallback synthesis (no AI API)...")
+    logger.info("📝 Using fallback synthesis (AI unavailable)...")
     
     response = f"# Research Analysis: {query}\n\n"
-    
     response += f"## 📊 Overview\n\n"
-    response += f"I've analyzed {len(papers)} peer-reviewed papers from ArXiv on this topic. "
-    response += f"Below is a comprehensive synthesis of the research landscape.\n\n"
+    response += f"I've analyzed {len(papers)} peer-reviewed papers from ArXiv on this topic.\n\n"
     
-    # Primary paper - detailed
-    response += f"## 📚 Foundational Research\n\n"
+    # Primary paper
+    response += f"## 📚 Primary Research\n\n"
     response += f"### {papers[0]['title']}\n"
     
     if papers[0].get('authors'):
@@ -276,31 +337,11 @@ def generate_fallback_synthesis(query: str, papers: List[Dict[str, Any]]) -> str
     if papers[0].get('published'):
         response += f"**Published:** {papers[0]['published']}\n"
     
-    response += f"\n**Abstract Summary:**\n{papers[0]['summary']}\n\n"
-    
-    # Extract key terms from first paper
-    summary_lower = papers[0]['summary'].lower()
-    key_indicators = []
-    
-    if any(term in summary_lower for term in ['propose', 'present', 'introduce', 'develop']):
-        key_indicators.append("**Novel Contribution:** This paper introduces new methods or frameworks")
-    
-    if any(term in summary_lower for term in ['experiment', 'evaluation', 'benchmark', 'dataset']):
-        key_indicators.append("**Empirical Evidence:** Includes experimental validation")
-    
-    if any(term in summary_lower for term in ['state-of-the-art', 'sota', 'outperform', 'improve']):
-        key_indicators.append("**Performance:** Claims improvements over existing methods")
-    
-    if key_indicators:
-        response += "**Key Characteristics:**\n"
-        for indicator in key_indicators:
-            response += f"• {indicator}\n"
-        response += "\n"
+    response += f"\n**Abstract:**\n{papers[0]['summary']}\n\n"
     
     # Supporting papers
     if len(papers) > 1:
         response += f"## 🔬 Supporting Literature\n\n"
-        response += f"The following {len(papers)-1} paper(s) provide complementary perspectives:\n\n"
         
         for idx, paper in enumerate(papers[1:], 2):
             response += f"### {idx}. {paper['title']}\n"
@@ -314,117 +355,17 @@ def generate_fallback_synthesis(query: str, papers: List[Dict[str, Any]]) -> str
                     response += f" ({paper['published']})"
                 response += "\n\n"
             
-            # Show first 400 chars of abstract
-            summary_preview = paper['summary'][:400]
-            if len(paper['summary']) > 400:
-                summary_preview += "..."
-            
-            response += f"{summary_preview}\n\n"
+            summary = paper['summary'][:350]
+            if len(paper['summary']) > 350:
+                summary += "..."
+            response += f"{summary}\n\n"
     
-    # Synthesis section
-    response += f"## 💡 Research Synthesis\n\n"
-    response += f"**Collective Insights:**\n\n"
-    response += f"These {len(papers)} papers collectively advance our understanding of {query} through:\n\n"
-    response += f"• **Theoretical Frameworks:** Establishing mathematical and conceptual foundations\n"
-    response += f"• **Methodological Innovation:** Introducing new techniques and approaches\n"
-    response += f"• **Empirical Validation:** Providing experimental evidence and benchmarks\n"
-    response += f"• **Practical Applications:** Demonstrating real-world utility\n\n"
-    
-    response += f"**Recommended Exploration:**\n\n"
-    response += f"1. **Start with Paper 1** - Provides foundational understanding\n"
-    if len(papers) > 1:
-        response += f"2. **Explore Papers 2-{len(papers)}** - Build on core concepts with specialized perspectives\n"
-    response += f"3. **Review citations** - Follow references for deeper context\n\n"
-    
-    response += f"*💾 Full paper PDFs are available via the citation links below.*\n"
+    response += f"## 💡 Synthesis\n\n"
+    response += f"These {len(papers)} papers collectively advance understanding of {query} through "
+    response += f"theoretical frameworks, methodological innovation, empirical validation, and practical applications.\n\n"
+    response += f"*💾 Full PDFs available via citation links below.*\n"
     
     return response
-
-def generate_conceptual_explanation(query: str, papers: List[Dict[str, Any]] = None) -> str:
-    """
-    Use Claude to generate conceptual explanation with optional paper context
-    
-    Args:
-        query: The conceptual question
-        papers: Optional papers for additional context
-        
-    Returns:
-        Claude-generated explanation
-    """
-    logger.info(f"🎓 Generating conceptual explanation with Claude...")
-    
-    # Build context from papers if available
-    papers_context = ""
-    if papers and len(papers) > 0:
-        papers_context = f"\n\nREFERENCE MATERIALS (optional context):\n"
-        for idx, paper in enumerate(papers[:2], 1):  # Use top 2 papers
-            papers_context += f"\nPaper {idx}: {paper['title']}\n"
-            papers_context += f"Summary: {paper['summary'][:300]}...\n"
-    
-    system_prompt = """You are an expert educator specializing in explaining complex technical concepts clearly and accurately. Your explanations should:
-
-1. Start with a clear, simple definition
-2. Break down concepts into understandable components
-3. Use analogies and examples where helpful
-4. Compare/contrast with related concepts
-5. Explain practical applications
-6. Be technically accurate but accessible
-
-Use markdown formatting with headers (###), bullet points, and **bold** for emphasis."""
-
-    user_prompt = f"""Please provide a comprehensive explanation for this question:
-
-"{query}"
-{papers_context}
-
-Structure your explanation to include:
-
-1. **Clear Definition**: What is this concept in simple terms?
-2. **Key Components**: What are the essential parts/elements?
-3. **How It Works**: Explain the mechanism or process
-4. **Practical Examples**: Real-world applications or use cases
-5. **Important Distinctions**: How does it differ from similar concepts?
-6. **When to Use**: Guidelines for application
-
-Aim for 400-600 words. Be technical but accessible. Use specific examples where possible."""
-
-    explanation = call_claude_api(
-        prompt=user_prompt,
-        system_prompt=system_prompt,
-        max_tokens=2000
-    )
-    
-    if explanation:
-        logger.info(f"✅ Conceptual explanation generated: {len(explanation)} chars")
-        return explanation
-    else:
-        # Fallback explanation
-        logger.warning("⚠️ Claude API unavailable, using fallback explanation")
-        return f"""### Understanding: {query}
-
-Let me provide a comprehensive explanation of this concept.
-
-**Core Concept:**
-{query} is an important topic in the field. Understanding it requires examining several key aspects:
-
-**Key Components:**
-• Fundamental elements that define this concept
-• How these components interact and relate
-• The underlying principles and theoretical foundations
-
-**Practical Applications:**
-This concept is widely used in:
-• Real-world scenarios across various domains
-• Industry applications and use cases
-• Academic research and advanced studies
-
-**Important Context:**
-When working with this concept, it's crucial to understand how it differs from related ideas and when to apply it versus alternative approaches.
-
----
-
-*💡 For deeper technical details, please review the research papers below which provide peer-reviewed insights.*
-"""
 
 # ==========================================
 # QUESTION TYPE DETECTION
@@ -438,21 +379,20 @@ def detect_question_type(query: str) -> str:
         r'\bhow does\b', r'\bhow do\b', r'\bhow to\b',
         r'\bdifference between\b', r'\bcompare\b', r'\bvs\b', r'\bversus\b',
         r'\bexplain\b', r'\bdescribe\b', r'\bdefine\b',
-        r'\bwhy\b', r'\bwhen to use\b', r'\badvantages\b', r'\bdisadvantages\b',
+        r'\bwhy\b', r'\bwhen to use\b', r'\badvantages\b',
         r'\bbasics\b', r'\bfundamentals\b', r'\bintroduction to\b',
         r'\bunderstand\b', r'\bmeaning of\b', r'\bconcept of\b'
     ]
     
     research_patterns = [
-        r'\blatest\b', r'\brecent\b', r'\bstate of the art\b', r'\bsota\b',
+        r'\blatest\b', r'\brecent\b', r'\bstate of the art\b',
         r'\bsurvey\b', r'\breview of\b', r'\badvances in\b',
-        r'\bcurrent research\b', r'\bbreakthrough\b', r'\bnew methods\b',
-        r'\bpapers on\b', r'\bstudies on\b', r'\bresearch on\b',
-        r'\btrends in\b', r'\bprogress in\b'
+        r'\bcurrent research\b', r'\bbreakthrough\b',
+        r'\bpapers on\b', r'\bstudies on\b', r'\btrends in\b'
     ]
     
-    conceptual_score = sum(1 for pattern in conceptual_patterns if re.search(pattern, query_lower))
-    research_score = sum(1 for pattern in research_patterns if re.search(pattern, query_lower))
+    conceptual_score = sum(1 for p in conceptual_patterns if re.search(p, query_lower))
+    research_score = sum(1 for p in research_patterns if re.search(p, query_lower))
     
     logger.info(f"📊 Question type: conceptual={conceptual_score}, research={research_score}")
     
@@ -463,9 +403,7 @@ def detect_question_type(query: str) -> str:
     elif research_score > 0:
         return 'research'
     else:
-        if len(query.split()) <= 5:
-            return 'conceptual'
-        return 'research'
+        return 'conceptual' if len(query.split()) <= 5 else 'research'
 
 # ==========================================
 # ARXIV FUNCTIONS
@@ -499,7 +437,7 @@ def search_arxiv_safe(query: str, max_results: int = 3) -> List[Dict[str, Any]]:
                 results.append(paper_data)
                 
             except Exception as e:
-                logger.error(f"   ✗ Error processing paper: {e}")
+                logger.error(f"Error processing paper: {e}")
                 continue
         
         logger.info(f"✅ Found {len(results)} papers")
@@ -518,27 +456,21 @@ def build_citation(paper: Dict[str, Any]) -> Dict[str, str]:
             "url": paper.get("url", ""),
             "type": "online"
         }
-    except Exception as e:
-        logger.error(f"❌ Citation error: {e}")
-        return {
-            "file": "Error",
-            "text": "Unable to extract",
-            "url": "",
-            "type": "online"
-        }
+    except:
+        return {"file": "Error", "text": "Unable to extract", "url": "", "type": "online"}
 
 # ==========================================
-# MAIN CHAT ENDPOINT - CLAUDE-POWERED
+# MAIN CHAT ENDPOINT - FREE LOCAL AI
 # ==========================================
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
     """
-    Claude-powered chat endpoint with advanced research synthesis
+    FREE Local AI-powered chat endpoint
+    100% FREE - NO PAYMENT REQUIRED!
     """
     logger.info("="*80)
-    logger.info("📥 NEW CHAT REQUEST - CLAUDE-POWERED MODE")
+    logger.info("📥 NEW CHAT REQUEST - FREE LOCAL AI MODE")
     logger.info(f"   Query: {request.query}")
-    logger.info(f"   Mode: {request.mode}")
     logger.info("="*80)
     
     try:
@@ -559,67 +491,57 @@ async def chat_endpoint(request: ChatRequest):
         
         # MODE: LIVE RESEARCH
         if "ArXiv" in request.mode or "Research" in request.mode:
-            logger.info("🔬 Processing CLAUDE-POWERED Research Mode")
+            logger.info("🔬 Processing FREE LOCAL AI Research Mode")
             
             try:
-                # ========================================
-                # STEP 1: DETECT QUESTION TYPE
-                # ========================================
+                # Detect question type
                 question_type = detect_question_type(request.query)
                 logger.info(f"🎯 Question type: {question_type}")
                 
-                # ========================================
-                # STEP 2: SEARCH ARXIV
-                # ========================================
+                # Search ArXiv
                 papers = search_arxiv_safe(request.query, max_results=3)
                 
-                if not papers or len(papers) == 0:
-                    logger.warning("⚠️ No papers found")
-                    
-                    response_text = f"I searched ArXiv for papers on '{request.query}' but didn't find relevant matches.\n\n"
-                    response_text += "**Suggestions:**\n"
-                    response_text += "• Try broader search terms\n"
-                    response_text += "• Check spelling and terminology\n"
-                    response_text += "• Use different keywords or phrases\n"
-                    
+                if not papers:
+                    response_text = f"No papers found on '{request.query}'. Try broader terms."
                     meta_data["intent"] = "SEARCH_FAILED"
                     meta_data["confidence"] = 30
                     
                 else:
-                    # ========================================
-                    # STEP 3: GENERATE RESPONSE WITH CLAUDE
-                    # ========================================
-                    
+                    # Generate response with LOCAL AI
                     if question_type == 'conceptual':
-                        # CONCEPTUAL: Explanation + Papers
                         logger.info("🎓 Mode: Conceptual Explanation")
                         
                         explanation = generate_conceptual_explanation(request.query, papers)
                         
-                        response_text = f"# 📚 Understanding: {request.query}\n\n"
-                        response_text += explanation
-                        response_text += "\n\n---\n\n"
-                        response_text += f"## 📖 Recommended Reading\n\n"
-                        response_text += f"For deeper technical insights, I recommend these {len(papers)} papers:\n\n"
-                        
-                        for idx, paper in enumerate(papers, 1):
-                            response_text += f"**{idx}. {paper['title']}**\n"
-                            if paper.get('authors'):
-                                authors = ", ".join(paper['authors'][:3])
-                                if len(paper['authors']) > 3:
-                                    authors += " et al."
-                                response_text += f"*{authors}"
-                                if paper.get('published'):
-                                    response_text += f" ({paper['published']})"
-                                response_text += "*\n\n"
-                        
-                        meta_data["intent"] = "CONCEPTUAL"
-                        meta_data["confidence"] = 90
-                        meta_data["xai_reason"] = "Claude-generated explanation with supporting research"
+                        if explanation:
+                            response_text = f"# 📚 Understanding: {request.query}\n\n"
+                            response_text += explanation
+                            response_text += "\n\n---\n\n"
+                            response_text += f"## 📖 Recommended Reading\n\n"
+                            response_text += f"For deeper insights, see these {len(papers)} papers:\n\n"
+                            
+                            for idx, paper in enumerate(papers, 1):
+                                response_text += f"**{idx}. {paper['title']}**\n"
+                                if paper.get('authors'):
+                                    authors = ", ".join(paper['authors'][:3])
+                                    if len(paper['authors']) > 3:
+                                        authors += " et al."
+                                    response_text += f"*{authors}"
+                                    if paper.get('published'):
+                                        response_text += f" ({paper['published']})"
+                                    response_text += "*\n\n"
+                            
+                            meta_data["intent"] = "CONCEPTUAL"
+                            meta_data["confidence"] = 90
+                            meta_data["xai_reason"] = "Local AI explanation (FREE)"
+                        else:
+                            # Fallback
+                            response_text = generate_fallback_synthesis(request.query, papers)
+                            meta_data["intent"] = "CONCEPTUAL"
+                            meta_data["confidence"] = 75
                         
                     elif question_type == 'research':
-                        # RESEARCH: Advanced Synthesis
-                        logger.info("🧠 Mode: Advanced Research Synthesis")
+                        logger.info("🧠 Mode: Research Synthesis")
                         
                         synthesis = generate_advanced_research_synthesis(request.query, papers)
                         
@@ -627,59 +549,53 @@ async def chat_endpoint(request: ChatRequest):
                             response_text = synthesis
                             meta_data["intent"] = "RESEARCH"
                             meta_data["confidence"] = 95
-                            meta_data["xai_reason"] = "Claude-powered synthesis of ArXiv research"
+                            meta_data["xai_reason"] = "Local AI synthesis (FREE)"
                         else:
-                            # Fallback if Claude unavailable
                             response_text = generate_fallback_synthesis(request.query, papers)
                             meta_data["intent"] = "RESEARCH"
                             meta_data["confidence"] = 85
-                            meta_data["xai_reason"] = "Structured synthesis (Claude API unavailable)"
                     
                     else:  # hybrid
-                        # HYBRID: Both explanation and synthesis
-                        logger.info("✨ Mode: Hybrid (Explanation + Synthesis)")
+                        logger.info("✨ Mode: Hybrid")
                         
                         explanation = generate_conceptual_explanation(request.query, papers)
                         
-                        response_text = f"# 📚 Understanding: {request.query}\n\n"
-                        response_text += explanation
-                        response_text += "\n\n---\n\n"
-                        
-                        synthesis = generate_advanced_research_synthesis(request.query, papers)
-                        
-                        if synthesis:
-                            response_text += f"## 🔬 Research Analysis\n\n"
-                            response_text += synthesis
+                        if explanation:
+                            response_text = f"# 📚 Understanding: {request.query}\n\n"
+                            response_text += explanation
+                            response_text += "\n\n---\n\n"
+                            
+                            synthesis = generate_advanced_research_synthesis(request.query, papers)
+                            if synthesis:
+                                response_text += f"## 🔬 Research Analysis\n\n{synthesis}"
+                            else:
+                                response_text += generate_fallback_synthesis(request.query, papers)
+                            
+                            meta_data["intent"] = "HYBRID"
+                            meta_data["confidence"] = 92
                         else:
-                            response_text += generate_fallback_synthesis(request.query, papers)
-                        
-                        meta_data["intent"] = "HYBRID"
-                        meta_data["confidence"] = 92
-                        meta_data["xai_reason"] = "Claude-powered hybrid analysis"
+                            response_text = generate_fallback_synthesis(request.query, papers)
+                            meta_data["intent"] = "HYBRID"
+                            meta_data["confidence"] = 80
                     
-                    # ========================================
-                    # STEP 4: BUILD CITATIONS
-                    # ========================================
+                    # Build citations
                     for paper in papers:
                         citations.append(build_citation(paper))
                     
-                    logger.info(f"✅ Response ready: {len(response_text)} chars, {len(citations)} citations")
+                    logger.info(f"✅ Response: {len(response_text)} chars, {len(citations)} citations")
                 
             except Exception as e:
                 logger.error(f"❌ Error: {e}")
                 logger.error(traceback.format_exc())
-                
-                response_text = "An error occurred while processing your request. Please try again."
+                response_text = "Error processing request. Please try again."
                 meta_data["intent"] = "ERROR"
         
-        # MODE: LOCAL
         else:
-            response_text = f"Ready to audit local documents. Upload a PDF to analyze '{request.query}'."
+            response_text = f"Ready to audit local documents. Upload PDF to analyze '{request.query}'."
             meta_data["confidence"] = 95
             meta_data["intent"] = "AUDIT"
         
-        logger.info("✅ Completed")
-        logger.info("="*80 + "\n")
+        logger.info("✅ Completed\n")
         
         return {
             "response": response_text,
@@ -688,7 +604,7 @@ async def chat_endpoint(request: ChatRequest):
         }
     
     except Exception as e:
-        logger.error(f"❌ CRITICAL ERROR: {e}")
+        logger.error(f"❌ CRITICAL: {e}")
         logger.error(traceback.format_exc())
         
         return {
@@ -698,16 +614,14 @@ async def chat_endpoint(request: ChatRequest):
         }
 
 # ==========================================
-# OTHER ENDPOINTS (UNCHANGED)
+# OTHER ENDPOINTS
 # ==========================================
 @app.post("/ingest")
 async def ingest_document(file: UploadFile = File(...)):
     """Handle PDF uploads"""
-    logger.info(f"📤 Upload: {file.filename}")
-    
     try:
         if not file.filename or not file.filename.lower().endswith('.pdf'):
-            raise HTTPException(400, "Only PDF files supported")
+            raise HTTPException(400, "Only PDF supported")
         
         os.makedirs("temp_data", exist_ok=True)
         safe_filename = "".join(c for c in file.filename if c.isalnum() or c in (' ', '.', '_', '-'))
@@ -717,60 +631,74 @@ async def ingest_document(file: UploadFile = File(...)):
             shutil.copyfileobj(file.file, buffer)
         
         return {"status": "success", "filename": safe_filename, "size": os.path.getsize(file_path)}
-        
     except Exception as e:
-        logger.error(f"❌ Upload error: {e}")
         raise HTTPException(500, str(e))
 
 @app.post("/feedback")
 async def feedback_endpoint(request: FeedbackRequest):
     """Handle feedback"""
-    logger.info(f"📝 Feedback: {request.rating}")
-    
     try:
         os.makedirs("feedback_logs", exist_ok=True)
         with open("feedback_logs/feedback.txt", "a") as f:
             f.write(f"{datetime.datetime.now().isoformat()} | {request.rating} | {request.query}\n")
-        return {"status": "recorded", "message": "Thank you!"}
-    except Exception as e:
-        return {"status": "recorded", "error": str(e)}
+        return {"status": "recorded"}
+    except:
+        return {"status": "recorded"}
 
 @app.get("/")
 def root():
     return {
         "service": "APERA Brain API",
-        "version": "7.0-claude-powered",
+        "version": "8.0-free-local-ai",
         "status": "operational",
-        "features": ["Claude AI Integration", "Advanced Research Synthesis", "Conceptual Explanations"]
+        "cost": "$0.00 - 100% FREE!",
+        "features": ["Local AI (Ollama)", "Zero Payment", "Research Synthesis"]
     }
 
 @app.get("/health")
 def health_check():
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    # Check if Ollama is running
+    try:
+        ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+        response = requests.get(f"{ollama_url}/api/tags", timeout=2)
+        ollama_status = "running" if response.status_code == 200 else "not running"
+    except:
+        ollama_status = "not running"
     
     return {
         "status": "healthy",
-        "version": "7.0-claude-powered",
-        "claude_api": "enabled" if api_key else "disabled (using fallback)",
+        "version": "8.0-free-local-ai",
+        "local_ai": ollama_status,
+        "cost": "$0.00 per query",
         "features": {
-            "advanced_synthesis": "active",
-            "conceptual_explanations": "active",
-            "arxiv_search": "active"
+            "local_ai_synthesis": "active" if ollama_status == "running" else "fallback mode",
+            "arxiv_search": "active",
+            "zero_payment": "guaranteed"
         }
     }
 
 @app.on_event("startup")
 async def startup_event():
     logger.info("="*80)
-    logger.info("🚀 APERA CLAUDE-POWERED API STARTING")
+    logger.info("🚀 APERA FREE LOCAL AI STARTING")
     logger.info("="*80)
     
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if api_key:
-        logger.info("✅ Claude API: ENABLED")
-    else:
-        logger.warning("⚠️ Claude API: DISABLED (set ANTHROPIC_API_KEY to enable)")
-        logger.info("   Running in FALLBACK mode - structured synthesis without AI")
+    # Check Ollama status
+    try:
+        ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+        response = requests.get(f"{ollama_url}/api/tags", timeout=2)
+        if response.status_code == 200:
+            logger.info("✅ LOCAL AI: RUNNING (Ollama)")
+            logger.info("   💰 Cost: $0.00 per query")
+            logger.info("   🧠 AI analysis: ACTIVE")
+        else:
+            logger.warning("⚠️ LOCAL AI: NOT RESPONDING")
+            logger.info("   Using fallback mode")
+    except:
+        logger.warning("⚠️ LOCAL AI: NOT RUNNING")
+        logger.info("   Start with: ollama serve")
+        logger.info("   Install from: https://ollama.com")
+        logger.info("   Using fallback mode (still works!)")
     
     for directory in ["temp_data", "feedback_logs", "logs"]:
         os.makedirs(directory, exist_ok=True)
@@ -779,21 +707,30 @@ async def startup_event():
 
 if __name__ == "__main__":
     print("\n" + "="*80)
-    print("🚀 APERA BRAIN API - CLAUDE-POWERED RESEARCH INTELLIGENCE")
+    print("🚀 APERA BRAIN API - 100% FREE LOCAL AI")
     print("="*80)
     print(f"📍 Server: http://0.0.0.0:8000")
-    print(f"📚 Docs: http://localhost:8000/docs")
+    print(f"💰 Cost: $0.00 per query - NO PAYMENT REQUIRED!")
     print("="*80)
     
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if api_key:
-        print("✅ CLAUDE API: ENABLED")
-        print("   🧠 Advanced AI synthesis active")
-        print("   🎓 Intelligent explanations active")
-    else:
-        print("⚠️ CLAUDE API: DISABLED")
-        print("   Set ANTHROPIC_API_KEY to enable AI features")
-        print("   Currently using structured fallback mode")
+    # Check Ollama
+    try:
+        ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+        response = requests.get(f"{ollama_url}/api/tags", timeout=2)
+        if response.status_code == 200:
+            print("✅ LOCAL AI: RUNNING")
+            print("   🧠 Intelligent synthesis: ACTIVE")
+            print("   💰 Cost: $0.00 (FREE FOREVER!)")
+        else:
+            print("⚠️ LOCAL AI: NOT RESPONDING")
+            print("   Running in fallback mode")
+    except:
+        print("⚠️ LOCAL AI: NOT RUNNING")
+        print("   Install: https://ollama.com")
+        print("   Start: ollama serve")
+        print("   Then: ollama pull llama3.2")
+        print("")
+        print("   Don't worry - fallback mode still works!")
     
     print("="*80 + "\n")
     
