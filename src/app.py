@@ -64,6 +64,12 @@ import hashlib
 import time
 import os
 
+import sqlite3
+import hashlib
+import time
+import os
+import base64
+
 # --- 1. DATABASE & SECURITY FUNCTIONS ---
 def init_db():
     """Initialize the SQLite database for users"""
@@ -116,6 +122,15 @@ def login_user(email, password):
     conn.close()
     return data
 
+def get_image_base64(file_path):
+    """Helper to load logo image"""
+    try:
+        with open(file_path, "rb") as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    except Exception:
+        return None
+
 # --- 2. SESSION MANAGEMENT ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -127,85 +142,106 @@ def logout():
     st.session_state.username = None
     st.rerun()
 
-# --- 3. LOGIN PAGE UI ---
+# --- 3. LOGIN PAGE UI (CENTERED) ---
 def login_page():
     init_db() # Ensure DB exists
     
-    # Custom CSS for the login screen
-    st.markdown("""
-        <style>
-        .stButton>button { width: 100%; border-radius: 5px; height: 3em; }
-        .login-header { text-align: center; color: #8b5cf6; font-size: 3rem; font-weight: 800; margin-bottom: 0;}
-        .login-sub { text-align: center; color: #64748b; margin-bottom: 2rem; }
-        </style>
+    # 1. Load Logo
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    logo_path = os.path.join(current_dir, "logo.png")
+    logo_b64 = get_image_base64(logo_path)
+    
+    # Fallback to emoji if file missing
+    if logo_b64:
+        img_tag = f'<img src="data:image/png;base64,{logo_b64}" width="120" style="margin-bottom: 20px; filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.3));">'
+    else:
+        img_tag = '<div style="font-size: 60px; margin-bottom: 1rem;">🔬</div>'
+
+    # 2. Centered Layout
+    # Use columns to squeeze content into the middle
+    left, center, right = st.columns([1, 2, 1])
+    
+    with center:
+        # Header
+        st.markdown(f"""
+        <div style="text-align: center; padding-top: 2rem;">
+            {img_tag}
+            <h1 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem;
+                       background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+                       -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                APERA SECURE GATEWAY
+            </h1>
+            <p style="color: #94a3b8; font-size: 1.1rem; margin-bottom: 2rem;">
+                Advanced Production-Grade Research Intelligence
+            </p>
+        </div>
         """, unsafe_allow_html=True)
 
-    # Hero Section
-    st.markdown('<div class="login-header">APERA SECURE GATEWAY</div>', unsafe_allow_html=True)
-    st.markdown('<div class="login-sub">Advanced Production-Grade Research Intelligence</div>', unsafe_allow_html=True)
+        # Tabs
+        tab1, tab2 = st.tabs(["🔐 Access System", "👤 New Account"])
 
-    # Tabs for Login vs Sign Up
-    tab1, tab2 = st.tabs(["🔐 Login", "👤 Create Account"])
-
-    with tab1:
-        # OAuth Simulation Buttons
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Sign in with Google", key="google_btn"):
-                with st.spinner("Verifying Google Workspace Identity..."):
-                    time.sleep(1.5)
-                    st.session_state.authenticated = True
-                    st.session_state.username = "Joel John (Google)"
-                    st.session_state.auth_provider = "Google"
-                    st.rerun()
-        with col2:
-            if st.button("Sign in with Microsoft", key="ms_btn"):
-                with st.spinner("Connecting to Azure AD..."):
-                    time.sleep(1.5)
-                    st.session_state.authenticated = True
-                    st.session_state.username = "Joel John (Microsoft)"
-                    st.session_state.auth_provider = "Microsoft"
-                    st.rerun()
-        
-        st.markdown("---")
-        
-        # Email Login
-        email = st.text_input("Email Address", key="login_email")
-        password = st.text_input("Password", type="password", key="login_pass")
-        
-        if st.button("Log In", type="primary"):
-            # Backdoor for Admin (Keep this for safety!)
-            if email == "admin" and password == "password":
-                 st.session_state.authenticated = True
-                 st.session_state.username = "Administrator"
-                 st.session_state.auth_provider = "Admin"
-                 st.rerun()
+        with tab1:
+            st.markdown("<br>", unsafe_allow_html=True)
             
-            # Real DB Check
-            user_result = login_user(email, password)
-            if user_result:
-                st.session_state.authenticated = True
-                st.session_state.username = user_result[0][2] # Full Name
-                st.session_state.auth_provider = "Local"
-                st.success(f"Welcome back, {st.session_state.username}")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error("Invalid Email or Password")
+            # OAuth Buttons
+            col_g, col_m = st.columns(2)
+            with col_g:
+                if st.button("Google Workspace", use_container_width=True):
+                    with st.spinner("Verifying Identity..."):
+                        time.sleep(1.2)
+                        st.session_state.authenticated = True
+                        st.session_state.username = "Joel John (Google)"
+                        st.session_state.auth_provider = "Google"
+                        st.rerun()
+            with col_m:
+                if st.button("Microsoft Azure", use_container_width=True):
+                    with st.spinner("Connecting to Azure AD..."):
+                        time.sleep(1.2)
+                        st.session_state.authenticated = True
+                        st.session_state.username = "Joel John (Microsoft)"
+                        st.session_state.auth_provider = "Microsoft"
+                        st.rerun()
 
-    with tab2:
-        new_name = st.text_input("Full Name", placeholder="John Doe")
-        new_email = st.text_input("Email Address", key="signup_email")
-        new_password = st.text_input("Create Password", type="password", key="signup_pass")
-        
-        if st.button("Create Account"):
-            if new_email and new_password and new_name:
-                if add_user(new_email, new_password, new_name):
-                    st.success("✅ Account created successfully! Please go to the Login tab.")
-                else:
-                    st.error("❌ That email is already registered.")
-            else:
-                st.warning("Please fill in all fields.")
+            st.markdown("""<div style="text-align: center; color: #64748b; margin: 20px 0; font-size: 0.8rem;">— OR ENTER CREDENTIALS —</div>""", unsafe_allow_html=True)
+
+            # Login Form
+            with st.form("login_form"):
+                email = st.text_input("Email", placeholder="admin")
+                password = st.text_input("Password", type="password", placeholder="••••••••")
+                
+                if st.form_submit_button("Authenticate", use_container_width=True, type="primary"):
+                    # Admin Backdoor
+                    if email == "admin" and password == "password":
+                         st.session_state.authenticated = True
+                         st.session_state.username = "Administrator"
+                         st.session_state.auth_provider = "Admin"
+                         st.rerun()
+                    
+                    # Real DB Check
+                    user_result = login_user(email, password)
+                    if user_result:
+                        st.session_state.authenticated = True
+                        st.session_state.username = user_result[0][2]
+                        st.session_state.auth_provider = "Local"
+                        st.rerun()
+                    else:
+                        st.error("Access Denied: Invalid credentials")
+
+        with tab2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            with st.form("signup_form"):
+                new_name = st.text_input("Full Name", placeholder="John Doe")
+                new_email = st.text_input("Email Address")
+                new_pass = st.text_input("Choose Password", type="password")
+                
+                if st.form_submit_button("Create Account", use_container_width=True):
+                    if new_email and new_pass and new_name:
+                        if add_user(new_email, new_pass, new_name):
+                            st.success("Account Created! Switch to 'Access System' tab to login.")
+                        else:
+                            st.error("User already exists.")
+                    else:
+                        st.warning("All fields are required.")
 
 # --- 4. APP FLOW CONTROL ---
 if not st.session_state.authenticated:
@@ -219,7 +255,6 @@ with st.sidebar:
     if st.button("Log Out"):
         logout()
     st.divider()
-
 # --- EPIC GOD MODE CSS ---
 st.markdown("""
 <style>
