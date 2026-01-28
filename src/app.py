@@ -444,9 +444,10 @@ def get_base64_logo():
     return None
 logo_b64 = get_base64_logo()
 
-# --- SIDEBAR CONFIGURATION ---
+# --- COPY AND PASTE THIS INTO src/app.py (REPLACING THE SIDEBAR SECTION) ---
+
 with st.sidebar:
-    # Safe check for logo (prevents NameError if not loaded)
+    # 1. Logo Display
     if "logo_b64" in locals() and logo_b64:
         st.markdown(f'''
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
@@ -455,45 +456,32 @@ with st.sidebar:
         </div>
         ''', unsafe_allow_html=True)
     
+    # 2. Session Info
     st.markdown(f"<div style='background:rgba(139,92,246,0.15);padding:8px 12px;border-radius:8px;font-size:0.85rem;font-weight:600;'>🔑 Session: {st.session_state.session_id}</div>", unsafe_allow_html=True)
-    
     st.markdown("---")
+
+    # 3. System Module Selector
     app_mode = st.radio("🧭 System Module:", ["Research Assistant", "Admin Audit"], index=0)
     
+    # 4. Engine Config (Only for Research Assistant)
     if app_mode == "Research Assistant":
         st.markdown("### ⚙️ Engine Configuration")
         
-        # FIXED INDENTATION HERE:
         search_mode = st.selectbox(
             "Retrieval Strategy:", 
             ["Live Research (ArXiv)"]
         )
-        
-        # Set the mode key based on selection
-        mode_key = "online"
         
         st.divider()
         if st.button("🗑️ Clear Context", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
 
+    # 5. Secure Logout (ONLY ONE BUTTON HERE)
     st.divider()
-    if st.button("🚪 Secure Logout", use_container_width=True, key="logout_sidebar"):
+    if st.button("🚪 Secure Logout", use_container_width=True, key="unique_logout_key"):
         st.session_state.authenticated = False
         st.rerun()
-        
-        # Map to backend mode key
-        mode_key = "local"
-        if "ArXiv" in search_mode: 
-            mode_key = "online"
-        if "Semantic" in search_mode: 
-            mode_key = "semantic"
-        
-        st.divider()
-        if st.button("🗑️ Clear Context", use_container_width=True):
-            st.session_state.messages = []
-            save_history([])
-            st.rerun()
 
 # --- ADMIN AUDIT VIEW ---
 if app_mode == "Admin Audit":
