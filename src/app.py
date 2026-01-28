@@ -241,18 +241,60 @@ def login_page():
                     else:
                         st.warning("All fields are required.")
 
-# --- 4. APP FLOW CONTROL ---
-if not st.session_state.authenticated:
-    login_page()
-    st.stop() # Stop here if not logged in
+# ==========================================
+# UNIFIED SIDEBAR (Paste this after st.stop())
+# ==========================================
 
-# Add Logout Button to Sidebar
 with st.sidebar:
-    st.write(f"Logged in as: **{st.session_state.username}**")
-    st.caption(f"Provider: {st.session_state.auth_provider}")
-    if st.button("Log Out"):
+    # 1. Header with Logo & User Info
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    logo_path = os.path.join(current_dir, "logo.png")
+    logo_b64 = get_image_base64(logo_path)
+
+    if logo_b64:
+        st.markdown(f'''
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:15px;">
+            <img src="data:image/png;base64,{logo_b64}" width="40" style="border-radius:8px;">
+            <div>
+                <h3 style="margin:0;font-size:1.1rem;color:#f8fafc;">APERA Pro</h3>
+                <div style="font-size:0.75rem;color:#94a3b8;">{st.session_state.username}</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+    else:
+        st.markdown(f"### 🔬 APERA Pro\n**{st.session_state.username}**")
+
+    # 2. Session Info Box
+    st.markdown(f"""
+    <div style='background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);padding:8px 12px;border-radius:8px;margin-bottom:24px;'>
+        <div style='font-size:0.7rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:1px;'>Active Session</div>
+        <div style='font-family:monospace;color:#a78bfa;font-size:0.9rem;'>{st.session_state.session_id}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 3. Main Navigation
+    app_mode = st.radio("🧭 System Module:", ["Research Assistant", "Admin Audit"])
+
+    # 4. Engine Controls
+    if app_mode == "Research Assistant":
+        st.markdown("---")
+        st.markdown("<div style='font-size:0.75rem;color:#94a3b8;font-weight:600;margin-bottom:10px;'>ENGINE CONTROLS</div>", unsafe_allow_html=True)
+        
+        # --- CRITICAL FIX: We save the result to 'mode_key' ---
+        mode_key = st.selectbox("Retrieval Strategy:", ["Live Research (ArXiv)"])
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🗑️ Clear Context", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
+    else:
+        # --- CRITICAL FIX: We give it a default value if not in Research mode ---
+        mode_key = "audit"
+
+    # 5. SINGLE Secure Logout Button
+    st.markdown("---")
+    if st.button("🚪 Secure Logout", use_container_width=True):
         logout()
-    st.divider()
 # --- EPIC GOD MODE CSS ---
 st.markdown("""
 <style>
