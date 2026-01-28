@@ -9,6 +9,8 @@ import pandas as pd
 import plotly.express as px
 import requests
 import streamlit as st
+import sqlite3
+import hashlib
 
 # --- CONFIGURATION ---
 API_URL = "https://unforsaken-sheri-unvitrified.ngrok-free.dev"
@@ -57,95 +59,166 @@ def get_cache_size():
             return len(json.load(f))
     return 0
 
-# --- AUTHENTICATION & LOGIN LOGIC ---
+import sqlite3
+import hashlib
+import time
+import os
+
+# --- 1. DATABASE & SECURITY FUNCTIONS ---
+def init_db():
+    """Initialize the SQLite database for users"""
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            email TEXT PRIMARY KEY,
+            password TEXT,
+            full_name TEXT,
+            provider TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def make_hash(password):
+    """Create a secure hash of the password"""
+    return hashlib.sha256(str.encode(password)).hexdigest()
+
+def add_user(email, password, full_name, provider='local'):
+    """Add a new user to the database"""
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    try:
+        # Check if user exists first
+        c.execute('SELECT email FROM users WHERE email = ?', (email,))
+        if c.fetchone():
+            conn.close()
+            return False
+            
+        if provider == 'local':
+            c.execute('INSERT INTO users (email, password, full_name, provider) VALUES (?,?,?,?)', 
+                      (email, make_hash(password), full_name, provider))
+        else:
+            c.execute('INSERT INTO users (email, password, full_name, provider) VALUES (?,?,?,?)', 
+                      (email, "oauth_user", full_name, provider))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        return False
+
+def login_user(email, password):
+    """Verify user credentials"""
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('SELECT * FROM users WHERE email = ? AND password = ?', (email, make_hash(password)))
+    data = c.fetchall()
+    conn.close()
+    return data
+
+# --- 2. SESSION MANAGEMENT ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-    st.session_state.session_id = str(uuid.uuid4())[:8]
+    st.session_state.username = None
+    st.session_state.auth_provider = None
 
-# Helper to read logo dynamically
-def get_image_base64(file_path):
-    import base64
-    try:
-        with open(file_path, "rb") as f:
-            data = f.read()
-        return base64.b64encode(data).decode()
-    except Exception:
-        return None
+def logout():
+    st.session_state.authenticated = False
+    st.session_state.username = None
+    st.rerun()
 
-def login_screen():
-    # 1. Load Logo
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    logo_path = os.path.join(current_dir, "logo.png")
-    logo_b64 = get_image_base64(logo_path)
+# --- 3. LOGIN PAGE UI ---
+def login_page():
+    init_db() # Ensure DB exists
     
-    # Fallback to emoji if file missing
-    if logo_b64:
-        img_tag = f'<img src="data:image/png;base64,{logo_b64}" width="140" style="margin-bottom: 20px; filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.4));">'
-    else:
-        img_tag = '<div style="font-size: 80px; margin-bottom: 1rem;">🔬</div>'
+    # Custom CSS for the login screen
+    st.markdown("""
+        <style>
+        .stButton>button { width: 100%; border-radius: 5px; height: 3em; }
+        .login-header { text-align: center; color: #8b5cf6; font-size: 3rem; font-weight: 800; margin-bottom: 0;}
+        .login-sub { text-align: center; color: #64748b; margin-bottom: 2rem; }
+        </style>
+        """, unsafe_allow_html=True)
 
-    # 2. Hero Section
-    st.markdown(f"""
-    <div style="text-align: center; padding: 4rem 0;">
-        {img_tag}
-        <h1 style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); 
-                   -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
-                   font-size: 3.5rem; font-weight: 900; margin-bottom: 0.5rem;">
-            APERA SECURE GATEWAY
-        </h1>
-        <p style="color: #94a3b8; font-size: 1.2rem; font-weight: 500;">
-            Advanced Production-Grade Research Intelligence
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # 3. Split Layout (SSO vs Admin)
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        # SSO Buttons
-        col_g, col_m = st.columns(2)
-        with col_g:
-            if st.button("Sign in with Google", use_container_width=True):
+    # Hero Section
+    st.markdown('<div class="login-header">APERA SECURE GATEWAY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-sub">Advanced Production-Grade Research Intelligence</div>', unsafe_allow_html=True)
+
+    # Tabs for Login vs Sign Up
+    tab1, tab2 = st.tabs(["🔐 Login", "👤 Create Account"])
+
+    with tab1:
+        # OAuth Simulation Buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Sign in with Google", key="google_btn"):
                 with st.spinner("Verifying Google Workspace Identity..."):
                     time.sleep(1.5)
                     st.session_state.authenticated = True
-                    st.session_state.username = "jjohnjoel2005@gmail.com"
-                    st.toast("Google Workspace Verified.")
-                    time.sleep(0.5)
+                    st.session_state.username = "Joel John (Google)"
+                    st.session_state.auth_provider = "Google"
                     st.rerun()
-        
-        with col_m:
-            if st.button("Sign in with Microsoft", use_container_width=True):
+        with col2:
+            if st.button("Sign in with Microsoft", key="ms_btn"):
                 with st.spinner("Connecting to Azure AD..."):
                     time.sleep(1.5)
                     st.session_state.authenticated = True
-                    st.session_state.username = "joel.john@microsoft.com"
-                    st.toast(" Azure AD Verified.")
-                    time.sleep(0.5)
+                    st.session_state.username = "Joel John (Microsoft)"
+                    st.session_state.auth_provider = "Microsoft"
                     st.rerun()
-
-        st.markdown("""<div style="text-align: center; color: #64748b; margin: 20px 0; font-size: 0.85rem;">— OR USE ADMIN CREDENTIALS —</div>""", unsafe_allow_html=True)
-
-        # Admin Login Form
-        with st.form("login_form"):
-            st.markdown("### System Access")
-            user = st.text_input("Username", placeholder="admin")
-            pw = st.text_input("Password", type="password", placeholder="••••••••")
-            submitted = st.form_submit_button("Authenticate", use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Email Login
+        email = st.text_input("Email Address", key="login_email")
+        password = st.text_input("Password", type="password", key="login_pass")
+        
+        if st.button("Log In", type="primary"):
+            # Backdoor for Admin (Keep this for safety!)
+            if email == "admin" and password == "password":
+                 st.session_state.authenticated = True
+                 st.session_state.username = "Administrator"
+                 st.session_state.auth_provider = "Admin"
+                 st.rerun()
             
-            if submitted:
-                if user == "admin" and pw == "password":
-                    st.session_state.authenticated = True
-                    st.session_state.username = "Administrator"
-                    st.success("Access Granted")
-                    time.sleep(0.5)
-                    st.rerun()
-                else:
-                    st.error("Access Denied")
+            # Real DB Check
+            user_result = login_user(email, password)
+            if user_result:
+                st.session_state.authenticated = True
+                st.session_state.username = user_result[0][2] # Full Name
+                st.session_state.auth_provider = "Local"
+                st.success(f"Welcome back, {st.session_state.username}")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("Invalid Email or Password")
 
+    with tab2:
+        new_name = st.text_input("Full Name", placeholder="John Doe")
+        new_email = st.text_input("Email Address", key="signup_email")
+        new_password = st.text_input("Create Password", type="password", key="signup_pass")
+        
+        if st.button("Create Account"):
+            if new_email and new_password and new_name:
+                if add_user(new_email, new_password, new_name):
+                    st.success("✅ Account created successfully! Please go to the Login tab.")
+                else:
+                    st.error("❌ That email is already registered.")
+            else:
+                st.warning("Please fill in all fields.")
+
+# --- 4. APP FLOW CONTROL ---
 if not st.session_state.authenticated:
-    login_screen()
-    st.stop()
+    login_page()
+    st.stop() # Stop here if not logged in
+
+# Add Logout Button to Sidebar
+with st.sidebar:
+    st.write(f"Logged in as: **{st.session_state.username}**")
+    st.caption(f"Provider: {st.session_state.auth_provider}")
+    if st.button("Log Out"):
+        logout()
+    st.divider()
 
 # --- EPIC GOD MODE CSS ---
 st.markdown("""
