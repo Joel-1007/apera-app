@@ -1078,8 +1078,8 @@ def health_check():
         ollama_status = "running" if response.status_code == 200 else "not running"
     except:
         ollama_status = "not running"
-    
-       return {
+
+    return {
         "status": "healthy",
         "version": "8.0-free-local-ai",
         "local_ai": ollama_status,
@@ -1088,7 +1088,7 @@ def health_check():
             "local_ai_synthesis": "active" if ollama_status == "running" else "fallback mode",
             "arxiv_search": "active",
             "zero_payment": "guaranteed",
-            "multi_agent_system": "active" if AGENTS_AVAILABLE else "inactive"  # ADD THIS
+            "multi_agent_system": "active" if AGENTS_AVAILABLE else "inactive"
         }
     }
 
