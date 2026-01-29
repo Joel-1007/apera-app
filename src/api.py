@@ -15,6 +15,8 @@ from logging.handlers import RotatingFileHandler
 import re
 import json
 import requests
+from better_profanity import profanity
+from textblob import TextBlob
 
 # ==========================================
 # LOGGING CONFIGURATION
@@ -35,6 +37,13 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("APERA")
+
+# ==========================================
+# ML/NLP INITIALIZATION
+# ==========================================
+# Initialize profanity filter for toxicity detection
+profanity.load_censor_words()
+logger.info("✅ Profanity filter initialized")
 
 # ==========================================
 # FASTAPI INITIALIZATION
@@ -460,6 +469,163 @@ def build_citation(paper: Dict[str, Any]) -> Dict[str, str]:
         return {"file": "Error", "text": "Unable to extract", "url": "", "type": "online"}
 
 # ==========================================
+# ML/NLP TOXICITY DETECTION
+# ==========================================
+def analyze_toxicity(text: str) -> Dict[str, Any]:
+    """
+    Real ML/NLP-based toxicity detection
+    
+    Uses two approaches:
+    1. Profanity detection (better_profanity)
+    2. Sentiment analysis (TextBlob)
+    
+    Args:
+        text: Text to analyze
+        
+    Returns:
+        Dictionary with toxicity metrics
+    """
+    logger.info(f"🔍 Analyzing toxicity for text: {text[:50]}...")
+    
+    try:
+        # 1. PROFANITY DETECTION (Rule-based NLP)
+        profanity_detected = profanity.contains_profanity(text)
+        censored_text = profanity.censor(text)
+        
+        # Count profane words
+        profane_word_count = len([word for word in text.split() if profanity.contains_profanity(word)])
+        
+        # 2. SENTIMENT ANALYSIS (ML-based NLP)
+        blob = TextBlob(text)
+        sentiment_polarity = blob.sentiment.polarity  # -1 (negative) to +1 (positive)
+        sentiment_subjectivity = blob.sentiment.subjectivity  # 0 (objective) to 1 (subjective)
+        
+        # 3. TOXICITY SCORING ALGORITHM
+        # Base score from profanity (0-0.5)
+        profanity_score = min(profane_word_count * 0.15, 0.5)
+        
+        # Add sentiment score (0-0.3)
+        # Very negative sentiment (< -0.5) indicates potential toxicity
+        sentiment_score = 0.0
+        if sentiment_polarity < -0.5:
+            sentiment_score = abs(sentiment_polarity) * 0.3
+        
+        # Add aggressive language patterns (0-0.2)
+        aggressive_patterns = [
+            r'\b(hate|stupid|dumb|idiot|moron)\b',
+            r'\b(kill|destroy|attack)\b',
+            r'!!+',  # Multiple exclamation marks
+            r'[A-Z]{5,}',  # All caps (shouting)
+        ]
+        
+        pattern_score = 0.0
+        for pattern in aggressive_patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                pattern_score += 0.05
+        
+        pattern_score = min(pattern_score, 0.2)
+        
+        # 4. CALCULATE FINAL TOXICITY SCORE (0.0 to 1.0)
+        toxicity_score = min(profanity_score + sentiment_score + pattern_score, 1.0)
+        
+        # 5. CLASSIFY TOXICITY LEVEL
+        if toxicity_score >= 0.7:
+            toxicity_level = "HIGH"
+            severity = "severe"
+        elif toxicity_score >= 0.4:
+            toxicity_level = "MEDIUM"
+            severity = "moderate"
+        elif toxicity_score >= 0.15:
+            toxicity_level = "LOW"
+            severity = "minor"
+        else:
+            toxicity_level = "SAFE"
+            severity = "none"
+        
+        result = {
+            "toxicity_score": round(toxicity_score, 3),
+            "toxicity_level": toxicity_level,
+            "severity": severity,
+            "profanity_detected": profanity_detected,
+            "profane_word_count": profane_word_count,
+            "sentiment_polarity": round(sentiment_polarity, 3),
+            "sentiment_subjectivity": round(sentiment_subjectivity, 3),
+            "censored_text": censored_text if profanity_detected else text,
+            "timestamp": datetime.datetime.now().isoformat(),
+            "method": "ML/NLP (better_profanity + TextBlob)"
+        }
+        
+        logger.info(f"✅ Toxicity analysis complete:")
+        logger.info(f"   Score: {toxicity_score:.3f} ({toxicity_level})")
+        logger.info(f"   Profanity: {profanity_detected}")
+        logger.info(f"   Sentiment: {sentiment_polarity:.3f}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Toxicity analysis error: {e}")
+        # Return safe default
+        return {
+            "toxicity_score": 0.0,
+            "toxicity_level": "UNKNOWN",
+            "severity": "none",
+            "profanity_detected": False,
+            "profane_word_count": 0,
+            "sentiment_polarity": 0.0,
+            "sentiment_subjectivity": 0.0,
+            "censored_text": text,
+            "timestamp": datetime.datetime.now().isoformat(),
+            "method": "Error - fallback",
+            "error": str(e)
+        }
+
+def log_toxicity_event(query: str, toxicity_data: Dict[str, Any], session_id: str):
+    """
+    Log toxicity events for monitoring and analysis
+    
+    Args:
+        query: User query
+        toxicity_data: Results from analyze_toxicity()
+        session_id: Session identifier
+    """
+    try:
+        os.makedirs("toxicity_logs", exist_ok=True)
+        
+        log_entry = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "session_id": session_id,
+            "query": query,
+            "toxicity_score": toxicity_data["toxicity_score"],
+            "toxicity_level": toxicity_data["toxicity_level"],
+            "profanity_detected": toxicity_data["profanity_detected"],
+            "sentiment_polarity": toxicity_data["sentiment_polarity"]
+        }
+        
+        # Append to JSON log
+        log_file = "toxicity_logs/events.json"
+        
+        logs = []
+        if os.path.exists(log_file):
+            with open(log_file, "r") as f:
+                try:
+                    logs = json.load(f)
+                except:
+                    logs = []
+        
+        logs.append(log_entry)
+        
+        # Keep only last 1000 events
+        logs = logs[-1000:]
+        
+        with open(log_file, "w") as f:
+            json.dump(logs, f, indent=2)
+        
+        logger.info(f"✅ Toxicity event logged")
+        
+    except Exception as e:
+        logger.error(f"❌ Error logging toxicity event: {e}")
+
+# ==========================================
 # MAIN CHAT ENDPOINT - FREE LOCAL AI
 # ==========================================
 @app.post("/chat")
@@ -467,6 +633,8 @@ async def chat_endpoint(request: ChatRequest):
     """
     FREE Local AI-powered chat endpoint
     100% FREE - NO PAYMENT REQUIRED!
+    
+    Now with ML/NLP Toxicity Detection Guardrails!
     """
     logger.info("="*80)
     logger.info("📥 NEW CHAT REQUEST - FREE LOCAL AI MODE")
@@ -488,6 +656,49 @@ async def chat_endpoint(request: ChatRequest):
                 "citations": [],
                 "meta": {"intent": "ERROR", "confidence": 0, "fairness": {"balance_label": "N/A", "diversity_flag": False}}
             }
+        
+        # ========================================
+        # ML/NLP GUARDRAIL: TOXICITY DETECTION
+        # ========================================
+        toxicity_analysis = analyze_toxicity(request.query)
+        
+        # Log toxicity event
+        log_toxicity_event(request.query, toxicity_analysis, request.session_id)
+        
+        # Add toxicity data to metadata
+        meta_data["toxicity"] = {
+            "score": toxicity_analysis["toxicity_score"],
+            "level": toxicity_analysis["toxicity_level"],
+            "profanity_detected": toxicity_analysis["profanity_detected"],
+            "sentiment": toxicity_analysis["sentiment_polarity"]
+        }
+        
+        # ========================================
+        # TOXICITY THRESHOLD ENFORCEMENT
+        # ========================================
+        if toxicity_analysis["toxicity_score"] >= 0.7:
+            # HIGH toxicity - reject request
+            logger.warning(f"⚠️ HIGH TOXICITY DETECTED: {toxicity_analysis['toxicity_score']}")
+            return {
+                "response": "⚠️ Your query contains inappropriate content. Please rephrase your question in a respectful manner.\n\n" +
+                           f"Toxicity Score: {toxicity_analysis['toxicity_score']:.2f}/1.0\n" +
+                           "Our system uses ML-based toxicity detection to maintain a safe research environment.",
+                "citations": [],
+                "meta": {
+                    "intent": "REJECTED_TOXICITY",
+                    "confidence": 0,
+                    "fairness": {"balance_label": "N/A", "diversity_flag": False},
+                    "toxicity": meta_data["toxicity"]
+                }
+            }
+        
+        elif toxicity_analysis["toxicity_score"] >= 0.4:
+            # MEDIUM toxicity - warn but proceed
+            logger.warning(f"⚠️ MEDIUM TOXICITY: {toxicity_analysis['toxicity_score']}")
+            warning_message = "⚠️ **Note**: Your query has been flagged for potentially inappropriate language. "
+            warning_message += "We've processed it, but please maintain respectful communication.\n\n---\n\n"
+        else:
+            warning_message = ""
         
         # MODE: LIVE RESEARCH
         if "ArXiv" in request.mode or "Research" in request.mode:
