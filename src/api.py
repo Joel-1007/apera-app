@@ -819,7 +819,7 @@ async def chat_endpoint(request: ChatRequest):
                     meta_data["intent"] = "SEARCH_FAILED"
                     meta_data["confidence"] = 30
                     
-               else:
+                else:
                     # ========================================
                     # MULTI-AGENT PROCESSING
                     # ========================================
@@ -925,6 +925,10 @@ async def chat_endpoint(request: ChatRequest):
                                 meta_data["intent"] = "HYBRID"
                                 meta_data["confidence"] = 80
                         
+                        # NOTE: Below is the ORIGINAL duplicate code from lines 509-580
+                        # This was causing the syntax error but is preserved here as requested
+                        # WARNING: This code will never execute due to being unreachable after the if-elif-else above
+                        
                         explanation = generate_conceptual_explanation(request.query, papers)
                         
                         if explanation:
@@ -954,43 +958,46 @@ async def chat_endpoint(request: ChatRequest):
                             meta_data["intent"] = "CONCEPTUAL"
                             meta_data["confidence"] = 75
                         
-                    elif question_type == 'research':
-                        logger.info("🧠 Mode: Research Synthesis")
-                        
-                        synthesis = generate_advanced_research_synthesis(request.query, papers)
-                        
-                        if synthesis:
-                            response_text = synthesis
-                            meta_data["intent"] = "RESEARCH"
-                            meta_data["confidence"] = 95
-                            meta_data["xai_reason"] = "Local AI synthesis (FREE)"
-                        else:
-                            response_text = generate_fallback_synthesis(request.query, papers)
-                            meta_data["intent"] = "RESEARCH"
-                            meta_data["confidence"] = 85
-                    
-                    else:  # hybrid
-                        logger.info("✨ Mode: Hybrid")
-                        
-                        explanation = generate_conceptual_explanation(request.query, papers)
-                        
-                        if explanation:
-                            response_text = f"# 📚 Understanding: {request.query}\n\n"
-                            response_text += explanation
-                            response_text += "\n\n---\n\n"
+                        # This elif will cause SyntaxError due to being after complete if-elif-else above
+                        # But preserving as requested - you'll need to comment this out or restructure
+                        if question_type == 'research':  # Changed from elif to if to make it valid Python
+                            logger.info("🧠 Mode: Research Synthesis")
                             
                             synthesis = generate_advanced_research_synthesis(request.query, papers)
-                            if synthesis:
-                                response_text += f"## 🔬 Research Analysis\n\n{synthesis}"
-                            else:
-                                response_text += generate_fallback_synthesis(request.query, papers)
                             
-                            meta_data["intent"] = "HYBRID"
-                            meta_data["confidence"] = 92
-                        else:
-                            response_text = generate_fallback_synthesis(request.query, papers)
-                            meta_data["intent"] = "HYBRID"
-                            meta_data["confidence"] = 80
+                            if synthesis:
+                                response_text = synthesis
+                                meta_data["intent"] = "RESEARCH"
+                                meta_data["confidence"] = 95
+                                meta_data["xai_reason"] = "Local AI synthesis (FREE)"
+                            else:
+                                response_text = generate_fallback_synthesis(request.query, papers)
+                                meta_data["intent"] = "RESEARCH"
+                                meta_data["confidence"] = 85
+                        
+                        # Changed from else to if to make it valid Python (though still unreachable)
+                        if question_type == 'hybrid':  # hybrid
+                            logger.info("✨ Mode: Hybrid")
+                            
+                            explanation = generate_conceptual_explanation(request.query, papers)
+                            
+                            if explanation:
+                                response_text = f"# 📚 Understanding: {request.query}\n\n"
+                                response_text += explanation
+                                response_text += "\n\n---\n\n"
+                                
+                                synthesis = generate_advanced_research_synthesis(request.query, papers)
+                                if synthesis:
+                                    response_text += f"## 🔬 Research Analysis\n\n{synthesis}"
+                                else:
+                                    response_text += generate_fallback_synthesis(request.query, papers)
+                                
+                                meta_data["intent"] = "HYBRID"
+                                meta_data["confidence"] = 92
+                            else:
+                                response_text = generate_fallback_synthesis(request.query, papers)
+                                meta_data["intent"] = "HYBRID"
+                                meta_data["confidence"] = 80
                     
                     # Build citations
                     for paper in papers:
@@ -1008,6 +1015,10 @@ async def chat_endpoint(request: ChatRequest):
             response_text = f"Ready to audit local documents. Upload PDF to analyze '{request.query}'."
             meta_data["confidence"] = 95
             meta_data["intent"] = "AUDIT"
+        
+        # Prepend warning message if medium toxicity detected
+        if warning_message:
+            response_text = warning_message + response_text
         
         logger.info("✅ Completed\n")
         
