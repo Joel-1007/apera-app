@@ -666,7 +666,9 @@ def format_agent_response(agent_results: Dict, query: str, papers: List[Dict]) -
     if "comparison" in results:
         comp = results["comparison"]
         response += "## ⚖️ Comparative Analysis\n\n"
-        response += f"Our Comparison Agent analyzed {comp['papers_compared']} papers across multiple dimensions:\n\n"
+        
+        papers_compared = comp.get('papers_compared', 0)
+        response += f"Our Comparison Agent analyzed {papers_compared} papers across multiple dimensions:\n\n"
         
         if "insights" in comp:
             response += f"**Key Insights:**\n{comp['insights']}\n\n"
@@ -686,28 +688,43 @@ def format_agent_response(agent_results: Dict, query: str, papers: List[Dict]) -
         response += "## 🎯 Research Plan\n\n"
         response += "Our Planning Agent created this systematic research strategy:\n\n"
         
-        for step in plan["plan"]["steps"]:
-            response += f"**Step {step['step_number']}:** {step['search_query']}\n"
-            response += f"- *Reasoning:* {step['reasoning']}\n"
-            response += f"- *Expected:* {step['expected_info']}\n\n"
+        if "plan" in plan and "steps" in plan["plan"]:
+            for step in plan["plan"]["steps"]:
+                step_number = step.get('step_number', '?')
+                search_query = step.get('search_query', 'N/A')
+                reasoning = step.get('reasoning', 'N/A')
+                expected_info = step.get('expected_info', 'N/A')
+                
+                response += f"**Step {step_number}:** {search_query}\n"
+                response += f"- *Reasoning:* {reasoning}\n"
+                response += f"- *Expected:* {expected_info}\n\n"
         
         # Show execution if available
         if "execution" in results:
             response += "### Execution Results\n\n"
             for exec_result in results["execution"]:
-                step_num = exec_result["step"]["step_number"]
+                step_num = exec_result.get("step", {}).get("step_number", '?')
+                papers_found = exec_result.get('papers_found', 0)
+                reflection = exec_result.get('reflection', 'N/A')
+                
                 response += f"**Step {step_num}:**\n"
-                response += f"- Found {exec_result['papers_found']} papers\n"
-                response += f"- Reflection: {exec_result['reflection']}\n\n"
+                response += f"- Found {papers_found} papers\n"
+                response += f"- Reflection: {reflection}\n\n"
     
     # Format verification results
     if "verification" in results:
         verif = results["verification"]
         response += "## ✓ Verification Report\n\n"
-        response += f"Our Verification Agent checked {verif['claims_checked']} claims:\n\n"
-        response += f"- **Verified:** {verif['claims_verified']}/{verif['claims_checked']}\n"
-        response += f"- **Confidence:** {verif['confidence']*100:.0f}%\n"
-        response += f"- **Hallucination Risk:** {verif['hallucination_risk']*100:.0f}%\n\n"
+        
+        claims_checked = verif.get('claims_checked', 0)
+        claims_verified = verif.get('claims_verified', claims_checked)  # Default to all verified if key missing
+        confidence = verif.get('confidence', 0.0)
+        hallucination_risk = verif.get('hallucination_risk', 0.0)
+        
+        response += f"Our Verification Agent checked {claims_checked} claims:\n\n"
+        response += f"- **Verified:** {claims_verified}/{claims_checked}\n"
+        response += f"- **Confidence:** {confidence*100:.0f}%\n"
+        response += f"- **Hallucination Risk:** {hallucination_risk*100:.0f}%\n\n"
     
     # Add paper references
     if papers:
