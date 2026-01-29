@@ -17,6 +17,12 @@ import json
 import requests
 from better_profanity import profanity
 from textblob import TextBlob
+from agents import (
+    AgentOrchestrator,
+    ResearchPlanningAgent,
+    PaperComparisonAgent,
+    CitationVerificationAgent
+)
 
 # ==========================================
 # LOGGING CONFIGURATION
@@ -37,7 +43,18 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("APERA")
-
+# ==========================================
+# AGENT SYSTEM INITIALIZATION
+# ==========================================
+# Initialize multi-agent orchestrator
+try:
+    agent_orchestrator = AgentOrchestrator()
+    AGENTS_AVAILABLE = True
+    logger.info("✅ Multi-agent system initialized")
+except Exception as e:
+    logger.warning(f"⚠️ Agents unavailable: {e}")
+    agent_orchestrator = None
+    AGENTS_AVAILABLE = False
 # ==========================================
 # ML/NLP INITIALIZATION
 # ==========================================
@@ -625,6 +642,91 @@ def log_toxicity_event(query: str, toxicity_data: Dict[str, Any], session_id: st
     except Exception as e:
         logger.error(f"❌ Error logging toxicity event: {e}")
 
+def format_agent_response(agent_results: Dict, query: str, papers: List[Dict]) -> str:
+    """
+    Format multi-agent results into readable response
+    
+    Args:
+        agent_results: Results from agent orchestrator
+        query: Original query
+        papers: Papers analyzed
+        
+    Returns:
+        Formatted markdown response
+    """
+    response = f"# 🤖 Multi-Agent Analysis: {query}\n\n"
+    
+    agents_used = agent_results["agents_used"]
+    response += f"**Agents Deployed:** {', '.join(agents_used)}\n\n"
+    response += "---\n\n"
+    
+    results = agent_results["results"]
+    
+    # Format comparison results
+    if "comparison" in results:
+        comp = results["comparison"]
+        response += "## ⚖️ Comparative Analysis\n\n"
+        response += f"Our Comparison Agent analyzed {comp['papers_compared']} papers across multiple dimensions:\n\n"
+        
+        if "insights" in comp:
+            response += f"**Key Insights:**\n{comp['insights']}\n\n"
+        
+        # Show comparison matrix
+        if "comparison_matrix" in comp:
+            response += "**Detailed Comparison:**\n\n"
+            for paper_key, dimensions in comp['comparison_matrix'].items():
+                response += f"### {paper_key}\n"
+                for dim, value in dimensions.items():
+                    response += f"- **{dim.title()}:** {value}\n"
+                response += "\n"
+    
+    # Format planning results
+    if "plan" in results:
+        plan = results["plan"]
+        response += "## 🎯 Research Plan\n\n"
+        response += "Our Planning Agent created this systematic research strategy:\n\n"
+        
+        for step in plan["plan"]["steps"]:
+            response += f"**Step {step['step_number']}:** {step['search_query']}\n"
+            response += f"- *Reasoning:* {step['reasoning']}\n"
+            response += f"- *Expected:* {step['expected_info']}\n\n"
+        
+        # Show execution if available
+        if "execution" in results:
+            response += "### Execution Results\n\n"
+            for exec_result in results["execution"]:
+                step_num = exec_result["step"]["step_number"]
+                response += f"**Step {step_num}:**\n"
+                response += f"- Found {exec_result['papers_found']} papers\n"
+                response += f"- Reflection: {exec_result['reflection']}\n\n"
+    
+    # Format verification results
+    if "verification" in results:
+        verif = results["verification"]
+        response += "## ✓ Verification Report\n\n"
+        response += f"Our Verification Agent checked {verif['claims_checked']} claims:\n\n"
+        response += f"- **Verified:** {verif['claims_verified']}/{verif['claims_checked']}\n"
+        response += f"- **Confidence:** {verif['confidence']*100:.0f}%\n"
+        response += f"- **Hallucination Risk:** {verif['hallucination_risk']*100:.0f}%\n\n"
+    
+    # Add paper references
+    if papers:
+        response += "## 📚 Papers Analyzed\n\n"
+        for idx, paper in enumerate(papers, 1):
+            response += f"{idx}. **{paper['title']}**\n"
+            if paper.get('authors'):
+                authors = ", ".join(paper['authors'][:3])
+                if len(paper['authors']) > 3:
+                    authors += " et al."
+                response += f"   *{authors}"
+                if paper.get('published'):
+                    response += f" ({paper['published']})"
+                response += "*\n\n"
+    
+    response += "\n💾 *Full citations available below*"
+    
+    return response
+
 # ==========================================
 # MAIN CHAT ENDPOINT - FREE LOCAL AI
 # ==========================================
@@ -717,10 +819,111 @@ async def chat_endpoint(request: ChatRequest):
                     meta_data["intent"] = "SEARCH_FAILED"
                     meta_data["confidence"] = 30
                     
-                else:
-                    # Generate response with LOCAL AI
-                    if question_type == 'conceptual':
-                        logger.info("🎓 Mode: Conceptual Explanation")
+               else:
+                    # ========================================
+                    # MULTI-AGENT PROCESSING
+                    # ========================================
+                    
+                    # Check if agents should be used
+                    use_agents = (
+                        AGENTS_AVAILABLE and 
+                        (len(papers) >= 2 or "compare" in request.query.lower())
+                    )
+                    
+                    if use_agents:
+                        logger.info("🤖 Deploying Multi-Agent System")
+                        
+                        # Let agents process the query
+                        agent_results = agent_orchestrator.process_query(
+                            query=request.query,
+                            query_type=question_type,
+                            papers=papers,
+                            search_function=search_arxiv_safe
+                        )
+                        
+                        # Format agent results for response
+                        response_text = format_agent_response(
+                            agent_results,
+                            request.query,
+                            papers
+                        )
+                        
+                        meta_data["intent"] = "AGENT_PROCESSED"
+                        meta_data["agents_used"] = agent_results["agents_used"]
+                        meta_data["confidence"] = 95
+                        meta_data["xai_reason"] = f"Multi-agent analysis: {', '.join(agent_results['agents_used'])}"
+                    
+                    else:
+                        # Original logic (no agents)
+                        if question_type == 'conceptual':
+                            logger.info("🎓 Mode: Conceptual Explanation")
+                            
+                            explanation = generate_conceptual_explanation(request.query, papers)
+                            
+                            if explanation:
+                                response_text = f"# 📚 Understanding: {request.query}\n\n"
+                                response_text += explanation
+                                response_text += "\n\n---\n\n"
+                                response_text += f"## 📖 Recommended Reading\n\n"
+                                response_text += f"For deeper insights, see these {len(papers)} papers:\n\n"
+                                
+                                for idx, paper in enumerate(papers, 1):
+                                    response_text += f"**{idx}. {paper['title']}**\n"
+                                    if paper.get('authors'):
+                                        authors = ", ".join(paper['authors'][:3])
+                                        if len(paper['authors']) > 3:
+                                            authors += " et al."
+                                        response_text += f"*{authors}"
+                                        if paper.get('published'):
+                                            response_text += f" ({paper['published']})"
+                                        response_text += "*\n\n"
+                                
+                                meta_data["intent"] = "CONCEPTUAL"
+                                meta_data["confidence"] = 90
+                                meta_data["xai_reason"] = "Local AI explanation (FREE)"
+                            else:
+                                # Fallback
+                                response_text = generate_fallback_synthesis(request.query, papers)
+                                meta_data["intent"] = "CONCEPTUAL"
+                                meta_data["confidence"] = 75
+                            
+                        elif question_type == 'research':
+                            logger.info("🧠 Mode: Research Synthesis")
+                            
+                            synthesis = generate_advanced_research_synthesis(request.query, papers)
+                            
+                            if synthesis:
+                                response_text = synthesis
+                                meta_data["intent"] = "RESEARCH"
+                                meta_data["confidence"] = 95
+                                meta_data["xai_reason"] = "Local AI synthesis (FREE)"
+                            else:
+                                response_text = generate_fallback_synthesis(request.query, papers)
+                                meta_data["intent"] = "RESEARCH"
+                                meta_data["confidence"] = 85
+                        
+                        else:  # hybrid
+                            logger.info("✨ Mode: Hybrid")
+                            
+                            explanation = generate_conceptual_explanation(request.query, papers)
+                            
+                            if explanation:
+                                response_text = f"# 📚 Understanding: {request.query}\n\n"
+                                response_text += explanation
+                                response_text += "\n\n---\n\n"
+                                
+                                synthesis = generate_advanced_research_synthesis(request.query, papers)
+                                if synthesis:
+                                    response_text += f"## 🔬 Research Analysis\n\n{synthesis}"
+                                else:
+                                    response_text += generate_fallback_synthesis(request.query, papers)
+                                
+                                meta_data["intent"] = "HYBRID"
+                                meta_data["confidence"] = 92
+                            else:
+                                response_text = generate_fallback_synthesis(request.query, papers)
+                                meta_data["intent"] = "HYBRID"
+                                meta_data["confidence"] = 80
                         
                         explanation = generate_conceptual_explanation(request.query, papers)
                         
@@ -876,7 +1079,7 @@ def health_check():
     except:
         ollama_status = "not running"
     
-    return {
+       return {
         "status": "healthy",
         "version": "8.0-free-local-ai",
         "local_ai": ollama_status,
@@ -884,9 +1087,55 @@ def health_check():
         "features": {
             "local_ai_synthesis": "active" if ollama_status == "running" else "fallback mode",
             "arxiv_search": "active",
-            "zero_payment": "guaranteed"
+            "zero_payment": "guaranteed",
+            "multi_agent_system": "active" if AGENTS_AVAILABLE else "inactive"  # ADD THIS
         }
     }
+
+@app.get("/admin/agents")
+def agent_stats():
+    """
+    Return agent collaboration statistics
+    Shows how many times agents were used and which agents
+    """
+    logger.info("🤖 Agent stats requested")
+    
+    try:
+        log_file = "agent_logs/collaborations.json"
+        
+        if not os.path.exists(log_file):
+            return {
+                "message": "No agent collaborations logged yet",
+                "total_collaborations": 0,
+                "agents_deployed": []
+            }
+        
+        with open(log_file, "r") as f:
+            collaborations = json.load(f)
+        
+        # Calculate statistics
+        total = len(collaborations)
+        
+        # Count agent deployments
+        agent_counts = {}
+        for collab in collaborations:
+            for agent in collab.get("agents_deployed", []):
+                agent_counts[agent] = agent_counts.get(agent, 0) + 1
+        
+        # Recent collaborations
+        recent = collaborations[-10:]
+        
+        return {
+            "total_collaborations": total,
+            "agent_deployment_counts": agent_counts,
+            "recent_collaborations": recent,
+            "multi_agent_system": "active",
+            "timestamp": datetime.datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error reading agent logs: {e}")
+        return {"error": str(e)}
 
 @app.on_event("startup")
 async def startup_event():
