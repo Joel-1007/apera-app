@@ -1,34 +1,30 @@
-## APERA Pro: Advanced Production-Grade Research Intelligence
-**A Hybrid, Ethical, and Live-Updating AI Research Assistant**
+**APERA Pro: Advanced Production-Grade Research Intelligence**
+**A Multi-Agent, Ethical, and Live-Updating AI Research System**
 
-![Status](https://img.shields.io/badge/Status-Live_Beta-blueviolet)
-![Architecture](https://img.shields.io/badge/Architecture-Hybrid_Cloud-blue)
-![Focus](https://img.shields.io/badge/Focus-Ethical_AI-green)
-![Python](https://img.shields.io/badge/Python-3.10%2B-yellow)
+**Executive Summary**
+APERA Pro (Advanced Production-Grade Ethical Research Assistant) is a proof-of-concept AI system designed to solve the "Knowledge Cutoff" and "Hallucination" problems in academic research.
 
-## Executive Summary
-**APERA Pro** (Advanced Production-Grade Ethical Research Assistant) is a proof-of-concept AI system designed to solve the "Knowledge Cutoff" problem in academic research.
+Unlike standard RAG pipelines that rely on static, pre-indexed vector databases, APERA Pro utilizes a Real-Time Multi-Agent Architecture. It connects a cloud-based user interface to a local Agentic Orchestrator that autonomously plans research strategies, fetches live pre-print papers from arXiv (2024-2026), and synthesizes findings using Local LLMs (Ollama) without data ever leaving the secure environment.
 
-Unlike standard chatbots that rely on frozen training data, APERA Pro uses a **Hybrid RAG (Retrieval-Augmented Generation)** architecture. It connects a cloud-based user interface to a local research engine that fetches, analyzes, and synthesizes **live pre-print papers from arXiv (2024-2026)** in real-time.
+The system emphasizes AI Safety with a specialized Governance Agent that enforces toxicity guardrails and a Verification Agent that calculates "Hallucination Risk" scores for every response.
 
-The system emphasizes **AI Ethics** with a built-in Governance Dashboard that monitors toxicity, hallucination risks, and citation bias (Global North vs. Global South representation).
+**System Architecture**
+APERA Pro implements a "Split-Brain" Agentic Strategy to ensure privacy and real-time accuracy.
 
----
-
-## System Architecture
-APERA Pro implements a **"Split-Brain" Strategy** to balance performance, cost, and security.
-
-```mermaid
 graph TD
     User(User via Browser) <-->|HTTPS| Streamlit(Streamlit Cloud UI)
     Streamlit <-->|Secure Tunnel| Ngrok(Ngrok Gateway)
     Ngrok <-->|REST API| FastAPI(Local FastAPI Server)
     
     subgraph "Local Secure Environment (The Brain)"
-        FastAPI --> Agent[RAG Agent / Orchestrator]
-        Agent --> Arxiv[Live arXiv API]
-        Agent --> VectorDB[(FAISS Vector DB)]
-        Agent --> LLM[Ollama / Llama3]
+        FastAPI --> Governance[🛡️ Governance Agent]
+        Governance --> Orchestrator[🎭 Orchestrator Agent]
         
-        VectorDB <--> Embed[SentenceTransformers]
+        Orchestrator --> Planner[🧠 Planning Agent]
+        Planner --> Arxiv[Live arXiv API]
+        
+        Arxiv --> Comparison[⚖️ Comparison Agent]
+        Comparison --> LLM[Ollama / Llama3 Local Inference]
+        
+        LLM --> Verifier[✓ Verification Agent]
     end
