@@ -430,10 +430,33 @@ def detect_question_type(query: str) -> str:
         return 'research'
     else:
         return 'conceptual' if len(query.split()) <= 5 else 'research'
-
 # ==========================================
 # ARXIV FUNCTIONS
 # ==========================================
+
+def get_smart_summary(text: str) -> str:
+    """
+    NOVELTY FEATURE: Semantic Extraction Algorithm
+    Instead of blindly cutting text at 300 chars, this extracts the 
+    first two complete sentences to provide a coherent insight.
+    """
+    try:
+        # Clean up newlines and extra spaces
+        clean_text = text.replace('\n', ' ').strip()
+        
+        # Split into sentences (basic heuristic)
+        sentences = clean_text.split('. ')
+        
+        # Return the first 2 sentences for a coherent description
+        if len(sentences) > 1:
+            return f"{sentences[0]}. {sentences[1]}."
+        elif len(sentences) == 1:
+            return f"{sentences[0]}."
+        else:
+            return "No summary available."
+    except:
+        return text[:300] + "..."
+
 def search_arxiv_safe(query: str, max_results: int = 3) -> List[Dict[str, Any]]:
     """Safely search ArXiv"""
     logger.info(f"🔎 Searching ArXiv: '{query}'")
@@ -474,11 +497,17 @@ def search_arxiv_safe(query: str, max_results: int = 3) -> List[Dict[str, Any]]:
         return []
 
 def build_citation(paper: Dict[str, Any]) -> Dict[str, str]:
-    """Build citation dictionary"""
+    """
+    Build citation dictionary using Smart Summary
+    This ensures the 'View Sources' box shows useful context.
+    """
     try:
+        # Use the Smart Summary logic here
+        smart_text = get_smart_summary(paper.get("summary", ""))
+        
         return {
             "file": paper.get("title", "Unknown"),
-            "text": paper.get("summary", "No summary")[:300] + "...",
+            "text": smart_text,  # <--- NOW USES SMART SUMMARY
             "url": paper.get("url", ""),
             "type": "online"
         }
